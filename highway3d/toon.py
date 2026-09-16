@@ -55,6 +55,7 @@ OPTIONS = [
     ("round", "float", 1.0, "Rounds the vehicle bodies: bevelled creases, plus Catmull-Clark above 0.5. 0 = the raw faceted models, 1.5+ adds a second subdivision.", (0.0, 2.0)),
     ("style", "str", "soft", "soft = physically-lit rounded forms with filmic tonemapping (feature-animation look); toon = hard cel bands over the same geometry.", ["soft", "toon"]),
     ("dof", "float", 4.0, "Depth of field f-stop; lower blurs the background more. 0 = everything sharp.", (0.0, 32.0)),
+    ("clouds", "float", 1.0, "Cumulus density on the sky dome. 0 = clear sky; higher breaks the cover into smaller, more numerous clouds.", (0.0, 4.0)),
     ("outline", "float", 0.0, "Inverted-hull ink outline on vehicles, in metres. 0 = off, 0.02 is a visible line.", (0.0, 0.1)),
     ("quality", "int", 16, "x264 CRF for the muxed video. Lower is better and bigger.", (0, 51)),
 ]

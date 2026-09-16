@@ -28,28 +28,36 @@ LOOKS = {
         sun_energy=1.70, soft_sun=6.2, soft_sky=0.20, sun_color=(1.0, 0.97, 0.90), horizon=(0.52, 0.66, 0.85),
         bands=[(0.34, 0.62), (0.52, 0.86), (0.78, 1.0)],
         fog=(0.66, 0.76, 0.90), fog_density=0.00070, fog_start=70.0,
-        fog_max=0.80, headlights=False,
+        fog_max=0.80, headlights=False, stars=False,
+        cloud_top=(1.0, 0.99, 0.97), cloud_base=(0.72, 0.77, 0.86),
+        cloud_strength=2.6,
     ),
     "golden": dict(
         sun_elev=5.5, sun_rot=-118.0, sky_strength=0.10, dust=3.4, ozone=2.4,
         sun_energy=1.62, soft_sun=5.8, soft_sky=0.20, sun_color=(1.0, 0.68, 0.36), horizon=(0.95, 0.66, 0.38),
         bands=[(0.30, 0.55), (0.50, 0.84), (0.76, 1.0)],
         fog=(0.88, 0.68, 0.48), fog_density=0.00105, fog_start=80.0,
-        fog_max=0.72, headlights=False,
+        fog_max=0.72, headlights=False, stars=False,
+        cloud_top=(1.0, 0.86, 0.66), cloud_base=(0.52, 0.44, 0.52),
+        cloud_strength=2.2,
     ),
     "dusk": dict(
         sun_elev=-2.4, sun_rot=-118.0, sky_strength=0.16, dust=4.2, ozone=3.2,
         sun_energy=0.42, soft_sun=1.95, soft_sky=0.62, sun_color=(1.0, 0.55, 0.30), horizon=(0.82, 0.48, 0.38),
         bands=[(0.26, 0.46), (0.46, 0.74), (0.72, 1.0)],
         fog=(0.68, 0.45, 0.42), fog_density=0.00150, fog_start=60.0,
-        fog_max=0.78, headlights=True,
+        fog_max=0.78, headlights=True, stars=True,
+        cloud_top=(0.85, 0.60, 0.52), cloud_base=(0.26, 0.24, 0.34),
+        cloud_strength=0.8,
     ),
     "night": dict(
         sun_elev=-14.0, sun_rot=150.0, sky_strength=2.60, dust=0.9, ozone=1.0,
         sun_energy=0.05, soft_sun=0.26, soft_sky=2.60, sun_color=(0.52, 0.64, 1.0), horizon=(0.06, 0.08, 0.15),
         bands=[(0.18, 0.30), (0.40, 0.62), (0.70, 1.0)],
         fog=(0.05, 0.07, 0.14), fog_density=0.00320, fog_start=45.0,
-        fog_max=0.88, headlights=True,
+        fog_max=0.88, headlights=True, stars=True,
+        cloud_top=(0.16, 0.19, 0.28), cloud_base=(0.05, 0.06, 0.11),
+        cloud_strength=0.55,
     ),
 }
 
@@ -217,7 +225,7 @@ def _base_colour(nt, base_color, texture, hue, noise, noise_scale):
 
 
 def _soft_material(mat, nt, out, name, base_color, look, rough, texture, hue,
-                   noise, noise_scale, emission):
+                   noise, noise_scale, emission, bump=0.0, bump_scale=40.0):
     """Physically-lit shading: rounded forms and real light, no cel bands.
 
     Banded ramps read as anime; the reference here is soft key light, real
@@ -229,6 +237,17 @@ def _soft_material(mat, nt, out, name, base_color, look, rough, texture, hue,
     bsdf.inputs["Metallic"].default_value = 0.0
     col = _base_colour(nt, base_color, texture, hue, noise, noise_scale)
     nt.links.new(col, bsdf.inputs["Base Color"])
+    if bump > 0:
+        # breaks a smooth canopy into lit and shaded clumps without geometry
+        bn = nt.nodes.new("ShaderNodeTexNoise")
+        bn.inputs["Scale"].default_value = bump_scale
+        bn.inputs["Detail"].default_value = 9.0
+        bn.inputs["Roughness"].default_value = 0.70
+        bmp = nt.nodes.new("ShaderNodeBump")
+        bmp.inputs["Strength"].default_value = bump
+        bmp.inputs["Distance"].default_value = 0.25
+        nt.links.new(bn.outputs["Fac"], bmp.inputs["Height"])
+        nt.links.new(bmp.outputs["Normal"], bsdf.inputs["Normal"])
     if "paint" in name:
         for sock, val in (("Coat Weight", 0.85), ("Coat Roughness", 0.08)):
             if sock in bsdf.inputs:
@@ -286,7 +305,7 @@ def _fog_factor(nt, look):
 
 def toon_material(name, base_color, look, rough=0.45, spec=0.35,
                   texture=None, rim=0.25, emission=None, hue=0.0, noise=0.0,
-                  noise_scale=38.0):
+                  noise_scale=38.0, bump=0.0, bump_scale=40.0):
     """Diffuse -> ShaderToRGB -> banded ramp -> tinted, plus sharp spec + rim."""
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -297,7 +316,8 @@ def toon_material(name, base_color, look, rough=0.45, spec=0.35,
 
     if STYLE == "soft":
         return _soft_material(mat, nt, out, name, base_color, look, rough,
-                              texture, hue, noise, noise_scale, emission)
+                              texture, hue, noise, noise_scale, emission,
+                              bump, bump_scale)
 
     diff = nt.nodes.new("ShaderNodeBsdfDiffuse")
     diff.inputs["Color"].default_value = (1, 1, 1, 1)
@@ -719,7 +739,61 @@ def setup_world(look):
     sky.air_density = 1.0
     sky.sun_intensity = 0.6 if look["sun_elev"] > 0 else 0.0
     sky.sun_disc = look["sun_elev"] > 2.0
-    nt.links.new(sky.outputs["Color"], bg.inputs["Color"])
+    sky_out = sky.outputs["Color"]
+    if look.get("stars"):
+        coord = nt.nodes.new("ShaderNodeTexCoord")
+        vor = nt.nodes.new("ShaderNodeTexVoronoi")
+        vor.feature = "F1"
+        vor.inputs["Scale"].default_value = 110.0
+        nt.links.new(coord.outputs["Generated"], vor.inputs["Vector"])
+        pts = nt.nodes.new("ShaderNodeValToRGB")
+        pr = pts.color_ramp
+        pr.interpolation = "CONSTANT"
+        pr.elements[0].position = 0.0
+        pr.elements[0].color = (1, 1, 1, 1)
+        pr.elements[1].position = 0.060
+        pr.elements[1].color = (0, 0, 0, 1)
+        nt.links.new(vor.outputs["Distance"], pts.inputs["Factor"])
+
+        # vary brightness so the field is not a uniform grid of identical dots
+        vary = nt.nodes.new("ShaderNodeTexNoise")
+        vary.inputs["Scale"].default_value = 9.0
+        nt.links.new(coord.outputs["Generated"], vary.inputs["Vector"])
+        gain = nt.nodes.new("ShaderNodeMixRGB")
+        gain.blend_type = "MULTIPLY"
+        gain.inputs["Factor"].default_value = 1.0
+        nt.links.new(pts.outputs["Color"], gain.inputs["Color1"])
+        nt.links.new(vary.outputs["Fac"], gain.inputs["Color2"])
+
+        # keep them above the horizon
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(coord.outputs["Generated"], sep.inputs["Vector"])
+        mask = nt.nodes.new("ShaderNodeMapRange")
+        mask.inputs["From Min"].default_value = 0.005
+        mask.inputs["From Max"].default_value = 0.10
+        mask.clamp = True
+        nt.links.new(sep.outputs["Z"], mask.inputs["Value"])
+        masked = nt.nodes.new("ShaderNodeMixRGB")
+        masked.blend_type = "MULTIPLY"
+        masked.inputs["Factor"].default_value = 1.0
+        nt.links.new(gain.outputs["Color"], masked.inputs["Color1"])
+        nt.links.new(mask.outputs["Result"], masked.inputs["Color2"])
+
+        gainup = nt.nodes.new("ShaderNodeMixRGB")
+        gainup.blend_type = "MULTIPLY"
+        gainup.inputs["Factor"].default_value = 1.0
+        g = look.get("star_gain", 2.5)
+        gainup.inputs["Color2"].default_value = (g, g, g, 1)
+        nt.links.new(masked.outputs["Color"], gainup.inputs["Color1"])
+
+        boost = nt.nodes.new("ShaderNodeMixRGB")
+        boost.blend_type = "ADD"
+        boost.inputs["Factor"].default_value = 1.0
+        nt.links.new(sky_out, boost.inputs["Color1"])
+        nt.links.new(gainup.outputs["Color"], boost.inputs["Color2"])
+        sky_out = boost.outputs["Color"]
+
+    nt.links.new(sky_out, bg.inputs["Color"])
     nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
 
     sun = bpy.data.lights.new("sun", type="SUN")
@@ -940,8 +1014,8 @@ class Traffic:
         bpy.ops.mesh.primitive_plane_add(size=1.0)
         p = bpy.context.object
         p.parent = root
-        p.location = (0.0, 0.0, 0.006)
-        p.scale = (2.15, 3.30, 1.0)
+        p.location = (0.0, 0.0, 0.005)
+        p.scale = (1.30, 2.90, 1.0)
         p.data.materials.clear()
         p.data.materials.append(self.contact)
         p.visible_shadow = False
@@ -976,7 +1050,7 @@ class Traffic:
             pos = road.point(s, u, 0.0)
             root = c["root"]
             root.location = pos
-            root.rotation_euler = (road.pitch(s) * (-1 if c["oncoming"] else 1),
+            root.rotation_euler = (road.pitch(s) * (1 if c["oncoming"] else -1),
                                    0.0, head)
             # angle = distance / rolling radius; wrong radius reads as wheelspin
             spin = (s / WHEEL_RADIUS) % math.tau
@@ -1048,6 +1122,7 @@ def build(cfg):
     traffic = Traffic(road, cfg, look, protos, colormap, cfg["seed"])
 
     setup_world(look)
+    clouds(look, cfg, road)
     cam = bpy.data.cameras.new("cam")
     cam.lens = cfg["lens"]
     if cfg["dof"] > 0:
@@ -1065,7 +1140,7 @@ def build(cfg):
         # real light on the road ahead; the per-car emissive quads only glow
         for side in (-1, 1):
             sl = bpy.data.lights.new(f"beam{side}", type="SPOT")
-            sl.energy = 24000.0 if STYLE == "soft" else 2600.0
+            sl.energy = 13000.0 if STYLE == "soft" else 2600.0
             sl.color = (1.0, 0.95, 0.86)
             sl.spot_size = math.radians(72.0)
             sl.spot_blend = 0.55
@@ -1110,7 +1185,7 @@ def place_camera(road, cobj, cfg, t):
 
 DEFAULTS = dict(look="day", camera="driver", width=1920, height=1080, fps=60,
                 duration=20.0, seed=7, speed=31.0, traffic=1.0, lane=2,
-                curve=1.0, hills=1.0, trees=1.0, samples=64, fidelity="high", mb_steps=12, shutter=0.45, round=1.0, style="soft", dof=4.0, motion_blur=True,
+                curve=1.0, hills=1.0, trees=1.0, samples=64, fidelity="high", mb_steps=12, shutter=0.45, round=1.0, style="soft", dof=4.0, clouds=1.0, motion_blur=True,
                 outline=0.0, lens=36.0, use_atlas=True, out="/tmp/out.png",
                 still=None, start=0, end=None)
 
@@ -1197,7 +1272,8 @@ def _ring(verts, cx, cy, cz, r, segs, squash=1.0):
     return base
 
 
-def _blob(verts, faces, c, r, segs=8, rings=4, squash=0.85):
+def _blob(verts, faces, c, r, segs=8, rings=4, squash=0.85,
+          jitter=0.0, rng=None):
     """Low-poly rounded canopy centred on c."""
     tops = []
     for j in range(rings + 1):
@@ -1212,8 +1288,14 @@ def _blob(verts, faces, c, r, segs=8, rings=4, squash=0.85):
             b = len(verts)
             for i in range(segs):
                 a = math.tau * i / segs
-                verts.append(Vector((c.x + math.cos(a) * rr,
-                                     c.y + math.sin(a) * rr, zz)))
+                k = 1.0
+                if jitter and rng is not None:
+                    # low-frequency lumps plus fine break-up
+                    k += jitter * (0.65 * math.sin(a * 3.0 + j * 2.1)
+                                   + 0.35 * rng.uniform(-1.0, 1.0))
+                verts.append(Vector((c.x + math.cos(a) * rr * k,
+                                     c.y + math.sin(a) * rr * k,
+                                     zz + (zz - c.z) * (k - 1.0) * 0.5)))
             tops.append((b, segs))
     for j in range(rings):
         b0, n0 = tops[j]
@@ -1380,7 +1462,8 @@ def tree_prototypes(look, rng, count=6):
     bark = toon_material("bark", (0.21, 0.145, 0.10), look, rough=0.88,
                          spec=0.05, rim=0.10, noise=0.28, noise_scale=52.0)
     leaf = toon_material("leaf", (0.145, 0.355, 0.135), look, rough=0.80,
-                         spec=0.10, rim=0.16, noise=0.24, noise_scale=13.0)
+                         spec=0.10, rim=0.16, noise=0.34, noise_scale=26.0,
+                         bump=0.75, bump_scale=95.0)
 
     hidden = bpy.data.collections.new("treeprotos")
     bpy.context.scene.collection.children.link(hidden)
@@ -1406,12 +1489,14 @@ def tree_prototypes(look, rng, count=6):
         # overlapping lobes give an organic outline instead of one ball
         crown = top + Vector((0, 0, h * 0.16))
         r0 = h * rng.uniform(0.30, 0.38)
-        _blob(v, f, crown, r0, segs=18, rings=12, squash=rng.uniform(0.80, 1.05))
+        _blob(v, f, crown, r0, segs=18, rings=12,
+              squash=rng.uniform(0.80, 1.05), jitter=0.13, rng=rng)
         for _ in range(rng.randint(2, 4)):
             off = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1),
                           rng.uniform(-0.45, 0.65))) * r0 * 0.85
             _blob(v, f, crown + off, r0 * rng.uniform(0.52, 0.78),
-                  segs=14, rings=10, squash=rng.uniform(0.85, 1.1))
+                  segs=14, rings=10, squash=rng.uniform(0.85, 1.1),
+                  jitter=0.16, rng=rng)
 
         me = bpy.data.meshes.new(f"tree{i}")
         me.from_pydata([tuple(x) for x in v], [], f)
@@ -1476,13 +1561,13 @@ def contact_shadow_material(look):
     ramp = nt.nodes.new("ShaderNodeValToRGB")
     cr = ramp.color_ramp
     cr.interpolation = "EASE"
-    cr.elements[0].position = 0.06
+    cr.elements[0].position = 0.14
     cr.elements[0].color = (1, 1, 1, 1)
-    cr.elements[1].position = 0.48
+    cr.elements[1].position = 0.50
     cr.elements[1].color = (0, 0, 0, 1)
     strength = nt.nodes.new("ShaderNodeMath")
     strength.operation = "MULTIPLY"
-    strength.inputs[1].default_value = 0.62
+    strength.inputs[1].default_value = 0.88
     nt.links.new(coord.outputs["Generated"], sub.inputs[0])
     nt.links.new(sub.outputs["Vector"], ln.inputs[0])
     nt.links.new(ln.outputs["Value"], ramp.inputs["Factor"])
@@ -1490,6 +1575,101 @@ def contact_shadow_material(look):
     nt.links.new(strength.outputs[0], bsdf.inputs["Alpha"])
     nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
     return mat
+
+
+
+def _dome(radius, segs=64, rings=20, zmin=0.02):
+    """Upper hemisphere shell, normals pointing inward at the camera."""
+    verts, faces = [], []
+    rows = []
+    for j in range(rings + 1):
+        t = j / rings
+        phi = (math.pi * 0.5) * (1.0 - t)          # zenith down to horizon
+        zz = math.sin(phi)
+        rr = math.cos(phi)
+        if zz < zmin and j != rings:
+            continue
+        b = len(verts)
+        for i in range(segs):
+            a = math.tau * i / segs
+            verts.append(Vector((math.cos(a) * rr * radius,
+                                 math.sin(a) * rr * radius, zz * radius)))
+        rows.append((b, segs))
+    for j in range(len(rows) - 1):
+        b0, n0 = rows[j]
+        b1, _ = rows[j + 1]
+        for i in range(n0):
+            faces.append((b0 + i, b1 + i, b1 + (i + 1) % n0, b0 + (i + 1) % n0))
+    return verts, faces
+
+
+def clouds(look, cfg, road):
+    """Cumulus on a sky dome.
+
+    Shaded rather than lit: the dome is far away and nearly edge-on at the
+    horizon, so a real BSDF gives almost no gradient. The same noise that cuts
+    the cloud shapes also drives a lit-top / shaded-base ramp, which reads as
+    volume from the ground.
+    """
+    if cfg["clouds"] <= 0:
+        return None
+    v, f = _dome(2400.0, segs=72, rings=22, zmin=0.035)
+    mat = bpy.data.materials.new("clouds")
+    mat.use_nodes = True
+    mat.surface_render_method = "BLENDED"
+    nt = mat.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    emit = nt.nodes.new("ShaderNodeEmission")
+
+    coord = nt.nodes.new("ShaderNodeTexCoord")
+    scale = nt.nodes.new("ShaderNodeMapping")
+    scale.inputs["Scale"].default_value = (4.5, 4.5, 3.0)
+    nt.links.new(coord.outputs["Generated"], scale.inputs["Vector"])
+
+    shape = nt.nodes.new("ShaderNodeTexNoise")
+    shape.inputs["Scale"].default_value = 3.4 * cfg["clouds"]
+    shape.inputs["Detail"].default_value = 12.0
+    shape.inputs["Roughness"].default_value = 0.48
+    nt.links.new(scale.outputs["Vector"], shape.inputs["Vector"])
+
+    cover = nt.nodes.new("ShaderNodeValToRGB")
+    cc = cover.color_ramp
+    cc.interpolation = "EASE"
+    cc.elements[0].position = 0.495
+    cc.elements[0].color = (0, 0, 0, 1)
+    cc.elements[1].position = 0.575
+    cc.elements[1].color = (1, 1, 1, 1)
+    nt.links.new(shape.outputs["Fac"], cover.inputs["Factor"])
+
+    # lit crown vs shaded base, from the same field offset upward
+    lit = nt.nodes.new("ShaderNodeValToRGB")
+    lc = lit.color_ramp
+    lc.interpolation = "EASE"
+    top = look.get("cloud_top", (1.0, 0.99, 0.97))
+    bot = look.get("cloud_base", (0.62, 0.66, 0.74))
+    lc.elements[0].position = 0.50
+    lc.elements[0].color = (*bot, 1)
+    lc.elements[1].position = 0.64
+    lc.elements[1].color = (*top, 1)
+    nt.links.new(shape.outputs["Fac"], lit.inputs["Factor"])
+
+    nt.links.new(lit.outputs["Color"], emit.inputs["Color"])
+    emit.inputs["Strength"].default_value = look.get("cloud_strength", 1.0)
+    mixsh = nt.nodes.new("ShaderNodeMixShader")
+    transp = nt.nodes.new("ShaderNodeBsdfTransparent")
+    nt.links.new(cover.outputs["Color"], mixsh.inputs["Fac"])
+    nt.links.new(transp.outputs["BSDF"], mixsh.inputs[1])
+    nt.links.new(emit.outputs["Emission"], mixsh.inputs[2])
+    nt.links.new(mixsh.outputs["Shader"], out.inputs["Surface"])
+
+    ob = mesh_from("clouds", v, f, mat)
+    ob.visible_shadow = False
+    mid = road.point((cfg["speed"] * cfg["duration"]) * 0.5, 0.0, 0.0)
+    ob.location = (mid.x, mid.y, 40.0)
+    for poly in ob.data.polygons:
+        poly.use_smooth = True
+    return ob
 
 if __name__ == "__main__":
     main()
