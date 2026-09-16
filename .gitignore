@@ -1,0 +1,15 @@
+# generated video and stills
+*.mp4
+*.png
+*.mov
+
+# downloaded CC0 assets, refetched by highway3d/setup.sh
+assets/
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# editor leftovers
+*~
