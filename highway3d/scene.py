@@ -249,9 +249,17 @@ def _soft_material(mat, nt, out, name, base_color, look, rough, texture, hue,
         nt.links.new(bn.outputs["Fac"], bmp.inputs["Height"])
         nt.links.new(bmp.outputs["Normal"], bsdf.inputs["Normal"])
     if "paint" in name:
-        for sock, val in (("Coat Weight", 0.85), ("Coat Roughness", 0.08)):
+        # clearcoat over a faintly metallic base is what makes car paint read
+        # as car paint: a tight specular lobe with a second, sharper highlight
+        bsdf.inputs["Metallic"].default_value = 0.22
+        bsdf.inputs["Roughness"].default_value = 0.16
+        for sock, val in (("Coat Weight", 1.0), ("Coat Roughness", 0.035),
+                          ("Coat IOR", 1.55)):
             if sock in bsdf.inputs:
                 bsdf.inputs[sock].default_value = val
+    if name.startswith("wheel"):
+        bsdf.inputs["Metallic"].default_value = 0.0
+        bsdf.inputs["Roughness"].default_value = 0.92
     if emission:
         nt.links.new(col, bsdf.inputs["Emission Color"])
         bsdf.inputs["Emission Strength"].default_value = emission
@@ -940,16 +948,26 @@ _AXIS = {"X": Vector((1, 0, 0)), "Y": Vector((0, 1, 0)),
          "Z": Vector((0, 0, 1))}
 
 
+# No solid object may ever pass through another solid object. Vehicles are
+# therefore not placed by an analytic formula -- traffic is simulated once at
+# build time with a safe-following rule, and the render samples that history.
+MIN_GAP = 5.5           # metres of clear tarmac between bumpers
+REACT = 0.72            # seconds of headway the follower keeps in hand
+ACCEL = 2.6             # m/s^2
+BRAKE = 7.5             # m/s^2
+WARMUP = 8.0            # seconds simulated before t=0 so traffic starts settled
+
+
 class Traffic:
     def __init__(self, road, cfg, look, protos, colormap, seed=7):
         self.road = road
         self.cfg = cfg
+        self.fps = cfg["fps"]
         rng = random.Random(seed + 11)
         self.cars = []
-        self.wheels = {}
 
-        wheel_mat = toon_material("wheel", (0.07, 0.07, 0.08), look, rough=0.62,
-                                  spec=0.10, rim=0.10)
+        wheel_mat = toon_material("wheel", (0.032, 0.032, 0.036), look,
+                                  rough=0.92, spec=0.06, rim=0.10)
         out_mat = glow_material("outline", (0.02, 0.02, 0.03), 0.0)
         self.contact = contact_shadow_material(look)
         # The inverted hull only reads as a line if the camera-facing half of
@@ -960,11 +978,9 @@ class Traffic:
         self.lamp_w = glow_material("lamp_w", (1.0, 0.95, 0.82), 14.0 * boost)
         self.lamp_r = glow_material("lamp_r", (1.0, 0.09, 0.05), 6.0 * boost)
 
-        n = int(cfg["traffic"] * 110)
         kinds = [k for k, _ in CAR_KINDS if k in protos]
-        span = cfg["speed"] * cfg["duration"] + 700.0
+        lengths = {k: _kind_length(protos[k]) for k in kinds}
 
-        # eight shared body materials -- one shader compile each, not one per car
         bodies = [
             toon_material(f"paint{j}", PAINT[j % len(PAINT)], look, rough=0.22,
                           spec=0.55,
@@ -973,42 +989,132 @@ class Traffic:
             for j in range(8)
         ]
 
-        for i in range(n):
-            oncoming = (i % 3 == 2)
-            kind = rng.choice(kinds)
-            lane = rng.randrange(LANES)
+        span = cfg["speed"] * cfg["duration"] + 900.0
+        cam_lane = cfg["lane"] - 1
+
+        # --- lay traffic out lane by lane, already spaced, so nothing starts
+        # --- inside anything else
+        plan = []
+        for oncoming in (False, True):
+            for lane in range(LANES):
+                # outer lanes run slower, as they do in life
+                lane_speed = cfg["speed"] * (1.12 - 0.11 * lane)
+                x = -380.0
+                while x < span:
+                    kind = rng.choice(kinds)
+                    ln = lengths[kind]
+                    # equilibrium headway for this speed, plus a random extra
+                    x += (ln + MIN_GAP + lane_speed * REACT
+                          + rng.expovariate(1.0 / 30.0))
+                    if x >= span:
+                        break
+                    v0 = lane_speed * rng.uniform(0.94, 1.07)
+                    plan.append(dict(kind=kind, lane=lane, oncoming=oncoming,
+                                     length=ln, v0=v0, x0=x))
+
+        rng.shuffle(plan)
+        want = int(cfg["traffic"] * 130)
+        plan = plan[:want] if want < len(plan) else plan
+
+        # the camera starts at 0 in its own lane; clear that slot so nothing
+        # is spawned on top of the viewpoint
+        plan = [c for c in plan
+                if c["oncoming"] or c["lane"] != cam_lane
+                or not (-26.0 < c["x0"] < 48.0)]
+        self.lead_index = None
+        if cfg["camera"] == "chase":
+            lead = "sedan-sports" if "sedan-sports" in protos else kinds[0]
+            plan.append(dict(kind=lead, lane=cam_lane, oncoming=False,
+                             length=lengths.get(lead, 4.4),
+                             v0=cfg["speed"], x0=15.0))
+            self.lead_index = len(plan) - 1
+
+        for i, spec in enumerate(plan):
             body = bodies[rng.randrange(len(bodies))]
-            root, wheels = make_car(protos, kind, f"car{i}", body, wheel_mat, body)
+            root, wheels = make_car(protos, spec["kind"], f"car{i}", body,
+                                    wheel_mat, body)
             if cfg["outline"] > 0:
                 outline(root, cfg["outline"], out_mat)
-
-            if i == 0 and cfg["camera"] == "chase":
-                # the car the chase camera actually follows
-                oncoming, lane = False, cfg["lane"] - 1
-                kind = "sedan-sports" if "sedan-sports" in protos else kinds[0]
-            own_lane = (not oncoming) and (lane == cfg["lane"] - 1)
-            if oncoming:
-                speed = rng.uniform(0.88, 1.12) * cfg["speed"]
-                s0 = rng.uniform(-120.0, span)
-            elif own_lane:
-                # holds station ahead so it never passes through the camera
-                speed = cfg["speed"]
-                if i == 0 and cfg["camera"] == "chase":
-                    s0 = 4.6
-                else:
-                    s0 = rng.uniform(34.0, span)
-            else:
-                speed = rng.uniform(0.80, 1.18) * cfg["speed"]
-                s0 = rng.uniform(-260.0, span)
-                # keep the neighbouring lanes clear of the start position too
-                if abs(s0) < 16.0:
-                    s0 += 40.0
-            self.cars.append(dict(root=root, wheels=wheels, lane=lane,
-                                  oncoming=oncoming, speed=speed, s0=s0,
-                                  drift=rng.uniform(0, math.tau)))
             self._contact(root)
             if look["headlights"]:
-                self._lamps(root, kind)
+                self._lamps(root, spec["kind"])
+            spec.update(root=root, wheels=wheels,
+                        drift=rng.uniform(0, math.tau))
+            self.cars.append(spec)
+
+        # the camera is a vehicle too, or it drives through the car in front
+        self.cam = dict(lane=cam_lane, oncoming=False, length=4.6,
+                        v0=cfg["speed"], x0=0.0, root=None)
+        self._simulate(cfg)
+
+    # ------------------------------------------------------------ simulation
+
+    def _simulate(self, cfg):
+        """Integrate a safe-following rule; store one position per frame.
+
+        Gipps-style: a follower never chooses a speed that would put it inside
+        the gap it can actually stop in, so overlap is impossible by
+        construction rather than by tuning the spawn spacing.
+        """
+        dt = 1.0 / self.fps
+        frames = int(cfg["duration"] * self.fps) + 4
+        warm = int(WARMUP * self.fps)
+
+        agents = self.cars + [self.cam]
+        groups = {}
+        for i, a in enumerate(agents):
+            groups.setdefault((a["oncoming"], a["lane"]), []).append(i)
+
+        x = [a["x0"] for a in agents]
+        v = [a["v0"] for a in agents]
+        hist = [[0.0] * frames for _ in agents]
+
+        for step in range(-warm, frames):
+            for idxs in groups.values():
+                order = sorted(idxs, key=lambda i: -x[i])   # leader first
+                for k, i in enumerate(order):
+                    want = agents[i]["v0"]
+                    if k > 0:
+                        lead = order[k - 1]
+                        gap = x[lead] - x[i] - agents[lead]["length"]
+                        want = min(want, max(0.0, (gap - MIN_GAP) / REACT))
+                    dv = want - v[i]
+                    v[i] = max(0.0, v[i] + max(-BRAKE * dt,
+                                               min(ACCEL * dt, dv)))
+                    x[i] += v[i] * dt
+                    if k > 0:
+                        # hard floor: the follower may not enter the leader's
+                        # tail, whatever the dynamics wanted to do
+                        limit = (x[order[k - 1]] - agents[order[k - 1]]["length"]
+                                 - MIN_GAP)
+                        if x[i] > limit:
+                            x[i] = limit
+                            v[i] = min(v[i], v[order[k - 1]])
+            if step >= 0:
+                for i in range(len(agents)):
+                    hist[i][step] = x[i]
+
+        for i, a in enumerate(agents):
+            a["hist"] = hist[i]
+        self.frames = frames
+
+    def _at(self, a, t):
+        """Distance travelled at time t, linearly interpolated between frames."""
+        f = t * self.fps
+        i0 = max(0, min(self.frames - 1, int(math.floor(f))))
+        i1 = max(0, min(self.frames - 1, i0 + 1))
+        w = f - i0
+        h = a["hist"]
+        return h[i0] * (1.0 - w) + h[i1] * w
+
+    CHASE_GAP = 13.5
+
+    def camera_s(self, t):
+        if self.lead_index is not None:
+            return self._at(self.cars[self.lead_index], t) - self.CHASE_GAP
+        return self._at(self.cam, t)
+
+    # -------------------------------------------------------------- geometry
 
     def _contact(self, root):
         bpy.ops.mesh.primitive_plane_add(size=1.0)
@@ -1038,25 +1144,38 @@ class Traffic:
     def update(self, t):
         road = self.road
         for c in self.cars:
+            travelled = self._at(c, t)
             if c["oncoming"]:
-                s = c["s0"] - c["speed"] * t
+                s = -travelled
                 u = lane_u(c["lane"], True)
                 head = road.heading(s) + math.pi + MODEL_FLIP
             else:
-                s = c["s0"] + c["speed"] * t
+                s = travelled
                 u = lane_u(c["lane"], False)
                 head = road.heading(s) + MODEL_FLIP
-            u += 0.12 * math.sin(t * 0.5 + c["drift"])
-            pos = road.point(s, u, 0.0)
+            u += 0.10 * math.sin(t * 0.5 + c["drift"])
             root = c["root"]
-            root.location = pos
+            root.location = road.point(s, u, 0.0)
             root.rotation_euler = (road.pitch(s) * (1 if c["oncoming"] else -1),
                                    0.0, head)
             # angle = distance / rolling radius; wrong radius reads as wheelspin
-            spin = (s / WHEEL_RADIUS) % math.tau
+            spin = (travelled / WHEEL_RADIUS) % math.tau
             for w in c["wheels"]:
                 w["ob"].rotation_quaternion = (
                     w["base"] @ Quaternion(_AXIS[w["axis"]], spin))
+
+
+def _kind_length(parts):
+    """Road-space length of a vehicle, from its body mesh."""
+    lo, hi = 1e9, -1e9
+    for ob in parts:
+        if "wheel" in ob.name.lower():
+            continue
+        for v in ob.data.vertices:
+            y = (ob.matrix_world @ v.co).y
+            lo = min(lo, y)
+            hi = max(hi, y)
+    return max(3.0, (hi - lo) * CAR_SCALE)
 
 
 def build(cfg):
@@ -1156,11 +1275,11 @@ def build(cfg):
     return road, traffic, cobj, look
 
 
-def place_camera(road, cobj, cfg, t):
+def place_camera(road, cobj, cfg, t, traffic=None):
     mode = cfg["camera"]
-    s = cfg["speed"] * t
+    s = traffic.camera_s(t) if traffic is not None else cfg["speed"] * t
     if mode == "chase":
-        s -= 8.2
+        # camera_s already sits the correct distance behind the lead car
         height, look_ahead = 2.30, 34.0
     elif mode == "bumper":
         height, look_ahead = 0.62, 46.0
@@ -1185,7 +1304,7 @@ def place_camera(road, cobj, cfg, t):
 
 DEFAULTS = dict(look="day", camera="driver", width=1920, height=1080, fps=60,
                 duration=20.0, seed=7, speed=31.0, traffic=1.0, lane=2,
-                curve=1.0, hills=1.0, trees=1.0, samples=64, fidelity="high", mb_steps=12, shutter=0.45, round=1.0, style="soft", dof=4.0, clouds=1.0, motion_blur=True,
+                curve=1.0, hills=1.0, trees=1.0, samples=64, fidelity="high", mb_steps=12, shutter=0.45, round=1.3, style="soft", dof=4.0, clouds=1.0, motion_blur=True,
                 outline=0.0, lens=36.0, use_atlas=True, out="/tmp/out.png",
                 still=None, start=0, end=None)
 
@@ -1222,7 +1341,7 @@ def main():
     if cfg["still"] is not None:
         t = cfg["still"]
         traffic.update(t)
-        place_camera(road, cobj, cfg, t)
+        place_camera(road, cobj, cfg, t, traffic)
         scn.render.filepath = cfg["out"]
         scn.render.image_settings.file_format = "PNG"
         bpy.ops.render.render(write_still=True)
@@ -1242,7 +1361,7 @@ def main():
     for f in range(start, end + 2):
         t = f / cfg["fps"]
         traffic.update(t)
-        place_camera(road, cobj, cfg, t)
+        place_camera(road, cobj, cfg, t, traffic)
         for c in traffic.cars:
             c["root"].keyframe_insert("location", frame=f)
             c["root"].keyframe_insert("rotation_euler", frame=f)

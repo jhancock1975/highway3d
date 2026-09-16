@@ -93,6 +93,38 @@ Two things that are *not* the cause, both measured rather than assumed:
 - **Material alpha.** A red cube in front of a green one renders pure red; no
   colour bleeds through.
 
+## Rule: solid objects never pass through solid objects
+
+Vehicles are not placed by an analytic formula. Traffic is simulated once at
+build time and the render samples that history, because any scheme that
+computes each car's position independently will eventually drive one through
+another -- a faster car in a lane will reach a slower one, and nothing in the
+formula stops it.
+
+`Traffic._simulate` integrates a safe-following rule per lane, then applies a
+hard positional clamp: a follower may not enter its leader's tail no matter
+what the dynamics wanted. The clamp is what makes the rule an invariant rather
+than something that holds while the parameters happen to be kind.
+
+Two things had to be got right for the dynamics not to fight the clamp:
+
+- **Start at equilibrium.** Initial gaps are `length + MIN_GAP + v * REACT`.
+  Spawning tighter than the following distance triggers a braking cascade at
+  t=0 that the brakes cannot resolve, and cars pile into each other.
+- **A follower cannot close a gap on a leader with the same desired speed.**
+  The chase camera drifted to 48 m and stayed there, because once it fell
+  behind during warm-up its target speed matched the lead's. The chase camera
+  is therefore locked to the lead car rather than simulated.
+
+Verify after any change to `Traffic`:
+
+```bash
+blender -b -P test_no_overlap.py -- --look day --camera chase --duration 20
+```
+
+It checks every pair in every lane on every frame and exits non-zero on
+overlap.
+
 ## Vehicle gotchas that cost real time
 
 Three of these produced complaints before they were found. All are baked into

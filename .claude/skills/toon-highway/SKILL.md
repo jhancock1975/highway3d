@@ -75,6 +75,18 @@ Car Kit into `assets/`, and renders a tiny frame to prove the pipeline works.
 | "a different version of the same thing" | change `--seed` |
 | longer or shorter | `--duration SECONDS` |
 
+## Hard rule: no solid object passes through another
+
+Traffic is simulated, not placed by formula, and a positional clamp stops any
+follower entering its leader's tail. After changing anything in `Traffic`, run:
+
+```bash
+blender -b -P highway3d/test_no_overlap.py -- --look day --camera chase --duration 20
+```
+
+Exits non-zero if any two vehicles ever overlap. Treat a failure as a bug, not
+as a tuning problem.
+
 ## Don't chase quality through render settings
 
 Measured on this scene: `--fidelity draft` vs `max` changes **zero** pixels by
@@ -121,6 +133,18 @@ check the alpha channel. Opaque geometry is alpha 1.0, and partial alpha
 should only appear on thin antialiased edges. Motion blur and material alpha
 have both been measured and ruled out.
 
+## Hard rule: no solid object passes through another
+
+Traffic is simulated, not placed by formula, and a positional clamp stops any
+follower entering its leader's tail. After changing anything in `Traffic`, run:
+
+```bash
+blender -b -P highway3d/test_no_overlap.py -- --look day --camera chase --duration 20
+```
+
+Exits non-zero if any two vehicles ever overlap. Treat a failure as a bug, not
+as a tuning problem.
+
 ## Don't
 
 - Don't raise `sun_energy` or `sky_strength` in `scene.py` without re-checking a
@@ -129,4 +153,6 @@ have both been measured and ruled out.
 - Don't switch the view transform to AgX or Filmic. It re-tonemaps colours that
   are already final and flattens the bands.
 - Don't edit the scene to change something an option already covers.
+- Don't 'fix' overlapping vehicles by widening spawn spacing. The clamp in
+  `Traffic._simulate` is the guarantee; if it is overlapping, that is broken.
 - Don't render at 4K "just in case" - it is 4x the cost of 1080p.
