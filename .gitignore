@@ -1,4 +1,5 @@
 # generated video and stills
+renders/
 *.mp4
 *.png
 *.mov
@@ -8,6 +9,7 @@ assets/
 
 # python
 .venv/
+.mcpvenv/
 __pycache__/
 *.pyc
 

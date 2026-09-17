@@ -278,12 +278,37 @@ re-tonemap colours that are already final and flatten the bands out.
 - Cost scales with `width x height x samples x fps x duration`, and roughly
   doubles with motion blur on.
 
+## MCP server
+
+Other agents drive the renderer over MCP rather than shelling out to Python,
+which is what `AGENTS.md` asks for.
+
+```bash
+.mcpvenv/bin/python mcp_server.py --port 8766      # streamable HTTP at /mcp
+```
+
+Three tools, named so they do not collide with other servers a client may have
+mounted: `highway_describe`, `highway_preview`, `highway_render`. Every
+argument that has a closed set is enumerated in the schema -- given only a
+parameter name a model invents values and the call comes back a refusal, so the
+enums earn their keystrokes.
+
+The server shells out to `toon.py` rather than importing `scene.py`, so the CLI
+stays the single source of truth: add an option there and it appears here.
+
+`highway_render` estimates wall clock before starting and refuses a job that
+would outrun a typical client timeout, with the numbers to reduce, rather than
+running for an hour and being killed. Port 8765 is taken by another project on
+this machine, hence 8766.
+
 ## Files
 
 ```
 toon.py     CLI: describe / preview / render. Runs on system Python.
 scene.py    Runs inside Blender. Builds the scene and renders it.
 setup.sh    Installs Blender + ffmpeg, downloads the CC0 models, smoke-tests.
+mcp_server.py   MCP front end over streamable HTTP. Needs .mcpvenv (uv venv + mcp).
+test_no_overlap.py  Asserts the no-interpenetration rule across a whole clip.
 ```
 
 ## Examples
