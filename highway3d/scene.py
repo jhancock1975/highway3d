@@ -977,9 +977,13 @@ class Traffic:
         boost = 3.0 if STYLE == "soft" else 1.0
         self.lamp_w = glow_material("lamp_w", (1.0, 0.95, 0.82), 14.0 * boost)
         self.lamp_r = glow_material("lamp_r", (1.0, 0.09, 0.05), 6.0 * boost)
+        self.plates = plate_prototypes(look)
 
         kinds = [k for k, _ in CAR_KINDS if k in protos]
         lengths = {k: _kind_length(protos[k]) for k in kinds}
+        # plate anchors have to come from the stretched meshes, not the raw
+        # model extents, or they end up buried inside the bodywork
+        self.bounds = {k: _kind_bounds(protos[k]) for k in kinds}
 
         bodies = [
             toon_material(f"paint{j}", PAINT[j % len(PAINT)], look, rough=0.22,
@@ -1036,6 +1040,7 @@ class Traffic:
             if cfg["outline"] > 0:
                 outline(root, cfg["outline"], out_mat)
             self._contact(root)
+            self._plates(root, rng, self.bounds[spec["kind"]])
             if look["headlights"]:
                 self._lamps(root, spec["kind"])
             spec.update(root=root, wheels=wheels,
@@ -1126,12 +1131,25 @@ class Traffic:
         p.data.materials.append(self.contact)
         p.visible_shadow = False
 
+    def _plates(self, root, rng, bounds):
+        """Front and rear plate, each carrying a code."""
+        me = self.plates[rng.randrange(len(self.plates))]
+        ymin, ymax, zlo = bounds
+        for name, y, rot in (("rear", ymax + 0.03, math.pi),
+                             ("front", ymin - 0.03, 0.0)):
+            ob = bpy.data.objects.new(f"{root.name}_plate_{name}", me)
+            bpy.context.collection.objects.link(ob)
+            ob.parent = root
+            ob.matrix_parent_inverse = Matrix.Identity(4)
+            ob.location = (0.0, y, zlo + 0.16)
+            ob.rotation_euler = (math.pi / 2, 0.0, rot)
+
     def _lamps(self, root, kind):
         for (dx, dy, dz, mat, size) in [
-            (-0.45, 1.24, 0.28, self.lamp_w, 0.16),
-            (0.45, 1.24, 0.28, self.lamp_w, 0.16),
-            (-0.48, -1.26, 0.34, self.lamp_r, 0.13),
-            (0.48, -1.26, 0.34, self.lamp_r, 0.13),
+            (-0.45, -1.26, 0.28, self.lamp_w, 0.16),   # front: white
+            (0.45, -1.26, 0.28, self.lamp_w, 0.16),
+            (-0.48, 1.24, 0.34, self.lamp_r, 0.13),    # rear: red
+            (0.48, 1.24, 0.34, self.lamp_r, 0.13),
         ]:
             bpy.ops.mesh.primitive_plane_add(size=size)
             p = bpy.context.object
@@ -1163,6 +1181,20 @@ class Traffic:
             for w in c["wheels"]:
                 w["ob"].rotation_quaternion = (
                     w["base"] @ Quaternion(_AXIS[w["axis"]], spin))
+
+
+def _kind_bounds(parts):
+    """(y_min, y_max, z_min) of the body shell, in car-local units."""
+    ylo, yhi, zlo = 1e9, -1e9, 1e9
+    for ob in parts:
+        if "wheel" in ob.name.lower():
+            continue
+        for v in ob.data.vertices:
+            co = ob.matrix_world @ v.co
+            ylo = min(ylo, co.y)
+            yhi = max(yhi, co.y)
+            zlo = min(zlo, co.z)
+    return ylo, yhi, zlo
 
 
 def _kind_length(parts):
@@ -1234,6 +1266,7 @@ def build(cfg):
     scenery(road, s0, s1, look, cfg, trees=False)
     plant_trees(road, s0, s1, look, cfg)
     furniture(road, s0, s1, look, cfg)
+    sign_legends(road, s0, s1, look, cfg)
 
     protos, colormap, _ = import_prototypes(look, CAR_KINDS)
     proportion_prototypes(protos)
@@ -1789,6 +1822,112 @@ def clouds(look, cfg, road):
     for poly in ob.data.polygons:
         poly.use_smooth = True
     return ob
+
+
+
+# --------------------------------------------------------------------- text
+# Nothing that would carry writing in life is left blank: signs get legends,
+# vehicles get plates. A blank green board reads as an unfinished placeholder.
+
+SIGN_LEGENDS = [
+    "NORTH  A12", "JUNCTION  7", "SERVICES  2 km", "CITY CENTRE",
+    "AIRPORT  14", "HARBOUR  9", "RING ROAD  N3", "WEST  B44",
+]
+PLATE_CODES = [
+    "KX21 ZTR", "MB68 QHV", "LR09 WKD", "TF34 NPS", "GJ77 XBE",
+    "DA52 VMR", "HN15 CQL", "PW83 JYT", "RC46 FDN", "SE90 BXA",
+]
+
+
+def text_mesh(body, size, name, extrude=0.0):
+    """Flat mesh of a string, built from a FONT curve.
+
+    Blender's default font is always present, so this works headless with no
+    asset dependency.
+    """
+    cu = bpy.data.curves.new(name + "_cu", type="FONT")
+    cu.body = body
+    cu.size = size
+    cu.align_x = "CENTER"
+    cu.align_y = "CENTER"
+    cu.extrude = extrude
+    tmp = bpy.data.objects.new(name + "_tmp", cu)
+    bpy.context.collection.objects.link(tmp)
+    dg = bpy.context.evaluated_depsgraph_get()
+    me = bpy.data.meshes.new_from_object(tmp.evaluated_get(dg))
+    me.name = name
+    bpy.data.objects.remove(tmp)
+    bpy.data.curves.remove(cu)
+    return me
+
+
+def _quad_mesh(name, w, h):
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([(-w / 2, -h / 2, 0), (w / 2, -h / 2, 0),
+                    (w / 2, h / 2, 0), (-w / 2, h / 2, 0)], [],
+                   [(0, 1, 2, 3)])
+    me.validate()
+    me.update()
+    return me
+
+
+def plate_prototypes(look, codes=PLATE_CODES):
+    """One mesh per plate code: white backing with the code merged into it."""
+    white = toon_material("plate_face", (0.88, 0.88, 0.84), look, rough=0.55,
+                          spec=0.20, rim=0.10)
+    ink = toon_material("plate_ink", (0.02, 0.02, 0.03), look, rough=0.75,
+                        spec=0.05, rim=0.0)
+    out = []
+    for i, code in enumerate(codes):
+        base = _quad_mesh(f"plate{i}", 0.36, 0.085)
+        glyphs = text_mesh(code, 0.052, f"plate{i}_t")
+        verts = [tuple(v.co) for v in base.vertices]
+        faces = [tuple(p.vertices) for p in base.polygons]
+        off = len(verts)
+        for v in glyphs.vertices:
+            verts.append((v.co.x, v.co.y, v.co.z + 0.0015))
+        n_base = len(faces)
+        for p in glyphs.polygons:
+            faces.append(tuple(idx + off for idx in p.vertices))
+        bpy.data.meshes.remove(glyphs)
+        bpy.data.meshes.remove(base)
+
+        me = bpy.data.meshes.new(f"plate{i}")
+        me.from_pydata(verts, [], faces)
+        me.validate()
+        me.update()
+        me.materials.append(white)
+        me.materials.append(ink)
+        for j, poly in enumerate(me.polygons):
+            poly.material_index = 0 if j < n_base else 1
+        out.append(me)
+    return out
+
+
+def sign_legends(road, s0, s1, look, cfg):
+    """Put a legend on every gantry board."""
+    rng = random.Random(cfg["seed"] + 404)
+    ink = toon_material("sign_ink", (0.93, 0.94, 0.92), look, rough=0.70,
+                        spec=0.10, rim=0.12)
+    s = s0 + 180.0
+    n = 0
+    while s < s1:
+        legend = SIGN_LEGENDS[rng.randrange(len(SIGN_LEGENDS))]
+        me = text_mesh(legend, 0.62, f"legend{n}")
+        me.materials.append(ink)
+        ob = bpy.data.objects.new(f"legend{n}", me)
+        bpy.context.collection.objects.link(ob)
+        u_mid = MEDIAN + CARRIAGE * 0.5
+        p = road.point(s, u_mid, 0.0)
+        head = road.heading(s)
+        # stand the glyphs up and face them at approaching traffic, just
+        # proud of the board so they never z-fight with it
+        ob.location = (p.x - math.sin(head) * -0.14,
+                       p.y - math.cos(head) * 0.14, p.z + 5.62)
+        ob.rotation_euler = (math.pi / 2, 0.0, head)
+        n += 1
+        s += 340.0
+    return n
 
 if __name__ == "__main__":
     main()

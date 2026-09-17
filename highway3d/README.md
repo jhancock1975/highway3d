@@ -93,6 +93,22 @@ Two things that are *not* the cause, both measured rather than assumed:
 - **Material alpha.** A red cube in front of a green one renders pure red; no
   colour bleeds through.
 
+## Rule: anything that carries writing in life carries writing here
+
+Street signs get legends, vehicles get plates. A blank green gantry board reads
+as an unfinished placeholder and is the first thing a viewer's eye lands on,
+because real highways have nothing blank on them.
+
+`text_mesh` builds a flat mesh from a FONT curve -- Blender's default font is
+always present, so it works headless with no asset dependency.
+`plate_prototypes` merges a code into a white backing so each plate is a single
+mesh with two material slots, and those are instanced across the traffic rather
+than built per vehicle. `sign_legends` puts a legend on every gantry.
+
+Anchor plates to the body bounds measured *after* `proportion_prototypes` and
+`round_prototypes` have run. Using the raw model extents buries them inside the
+bodywork, which is silent -- the plate renders, you just never see it.
+
 ## Rule: solid objects never pass through solid objects
 
 Vehicles are not placed by an analytic formula. Traffic is simulated once at

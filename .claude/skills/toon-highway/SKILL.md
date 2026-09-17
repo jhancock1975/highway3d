@@ -75,6 +75,12 @@ Car Kit into `assets/`, and renders a tiny frame to prove the pipeline works.
 | "a different version of the same thing" | change `--seed` |
 | longer or shorter | `--duration SECONDS` |
 
+## Hard rule: nothing that would carry writing is left blank
+
+Signs carry legends and vehicles carry plates, always. If you add an object
+that would have text on it in life, give it text -- `text_mesh()` builds one
+from Blender's built-in font, no assets needed.
+
 ## Hard rule: no solid object passes through another
 
 Traffic is simulated, not placed by formula, and a positional clamp stops any
@@ -132,6 +138,12 @@ Verify before changing anything: render with `film_transparent = True` and
 check the alpha channel. Opaque geometry is alpha 1.0, and partial alpha
 should only appear on thin antialiased edges. Motion blur and material alpha
 have both been measured and ruled out.
+
+## Hard rule: nothing that would carry writing is left blank
+
+Signs carry legends and vehicles carry plates, always. If you add an object
+that would have text on it in life, give it text -- `text_mesh()` builds one
+from Blender's built-in font, no assets needed.
 
 ## Hard rule: no solid object passes through another
 
