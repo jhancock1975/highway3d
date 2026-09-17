@@ -16,7 +16,10 @@ import random
 import sys
 from mathutils import Vector, Quaternion, Matrix
 
-ASSETS = "/Users/john/git/adult/assets"
+# resolved from this file, not hardcoded: the repo has to work from any
+# checkout path, and an absolute home path leaks a username besides
+ASSETS = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets"))
 GLB = os.path.join(ASSETS, "cars/kenney/Models/GLB format")
 HDRI = os.path.join(ASSETS, "hdri")
 
