@@ -172,10 +172,11 @@ def _resample(x: np.ndarray, src: int, dst: int) -> np.ndarray:
     return np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x)
 
 
-def _write_wav(path: str, left: np.ndarray, right: np.ndarray) -> None:
+def _write_wav(path: str, left: np.ndarray, right: np.ndarray,
+               target_peak: float = 0.92) -> None:
     peak = max(np.abs(left).max(), np.abs(right).max(), 1e-9)
-    if peak > 0.97:
-        left, right = left * (0.97 / peak), right * (0.97 / peak)
+    g = target_peak / peak
+    left, right = left * g, right * g
     inter = np.empty(len(left) * 2)
     inter[0::2] = left
     inter[1::2] = right
@@ -189,8 +190,8 @@ def _write_wav(path: str, left: np.ndarray, right: np.ndarray) -> None:
 
 def build(motion_path: str, out_path: str, narration: str | None = None,
           music: str | None = None, seed: int = 7,
-          bed_gain: float = 1.0, vo_gain: float = 1.0,
-          music_gain: float = 0.42) -> dict:
+          bed_gain: float = 0.55, vo_gain: float = 2.3,
+          music_gain: float = 0.28) -> dict:
     with open(motion_path) as fh:
         motion = json.load(fh)
     rng = np.random.default_rng(seed)
@@ -222,7 +223,7 @@ def build(motion_path: str, out_path: str, narration: str | None = None,
         # duck the bed under speech so the voice stays intelligible
         env = _fast_lowpass(np.abs(vo), 6.0)
         env /= (env.max() + 1e-9)
-        duck = 1.0 - 0.62 * np.clip(env * 2.2, 0.0, 1.0)
+        duck = 1.0 - 0.78 * np.clip(env * 2.6, 0.0, 1.0)
         left = left * duck + vo * vo_gain
         right = right * duck + vo * vo_gain
         layers.append("narration (ducked)")
@@ -240,11 +241,12 @@ def main():
     ap.add_argument("--narration")
     ap.add_argument("--music")
     ap.add_argument("--seed", type=int, default=7)
-    ap.add_argument("--bed-gain", type=float, default=1.0)
-    ap.add_argument("--music-gain", type=float, default=0.42)
+    ap.add_argument("--bed-gain", type=float, default=0.55)
+    ap.add_argument("--vo-gain", type=float, default=2.3)
+    ap.add_argument("--music-gain", type=float, default=0.28)
     a = ap.parse_args()
     info = build(a.motion, a.out, a.narration, a.music, a.seed,
-                 a.bed_gain, 1.0, a.music_gain)
+                 a.bed_gain, a.vo_gain, a.music_gain)
     print(json.dumps(info))
 
 

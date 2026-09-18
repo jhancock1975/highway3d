@@ -307,7 +307,29 @@ GPU contention against Blender. `uv venv .ttsvenv && uv pip install --python
 .ttsvenv/bin/python kokoro soundfile`. Its G2P shells out to `uv` for a spaCy
 model on first run, so `VIRTUAL_ENV` must be set or that install fails.
 
-### Music, if it is ever wanted
+### Music
+
+`music.py` writes a score rather than generating one with a model: four layers
+-- pad, bass, arpeggio and a soft pulse -- over a looping progression, in three
+moods (`drive`, `open`, `night`). numpy only.
+
+```bash
+python3 music.py --duration 20 --out music.wav --mood drive
+```
+
+The reason to write it is the same as for the sound effects: no weights to
+fetch, no licence that follows the output, and the length comes out exact so it
+never has to be looped or cut to fit the picture.
+
+### Mixing
+
+`audio.py --music --narration` layers score, bed and voice, ducking the backing
+under speech. Check the balance rather than trusting it: measure windowed peaks
+during speech against the gaps. Narration wants to land around 1.8-2x the
+backing; a mean over a per-sample mask will read close to 1.0 even when the
+balance is right, because speech is full of gaps between syllables.
+
+### Model-based music, if it is ever wanted
 
 Licence matters more than quality here, because the weights' licence follows
 the output:
