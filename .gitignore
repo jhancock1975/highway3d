@@ -15,3 +15,7 @@ __pycache__/
 
 # editor leftovers
 *~
+
+# intermediate audio and per-segment scratch
+*.wav
+.work/
