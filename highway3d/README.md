@@ -278,6 +278,47 @@ re-tonemap colours that are already final and flatten the bands out.
 - Cost scales with `width x height x samples x fps x duration`, and roughly
   doubles with motion blur on.
 
+## Sound
+
+The soundtrack is generated from the traffic simulation, not sampled:
+
+```bash
+blender -b -P motion_dump.py -- --look day --camera chase --duration 20 \
+    --motion-out /tmp/motion.json
+python3 audio.py --motion /tmp/motion.json --out track.wav --narration vo.wav
+ffmpeg -i clip.mp4 -i track.wav -map 0:v -map 1:a -c:v copy -c:a aac -shortest out.mp4
+```
+
+`motion_dump.py` writes, per frame, the camera's speed and every nearby
+vehicle's position relative to it. `audio.py` turns that into road roar and
+engine from the camera's own speed, plus one Doppler-shifted whoosh per vehicle
+that actually passes, panned to the side it actually went. Narration is mixed
+in with the bed ducked under it. Only dependency is numpy.
+
+Two things this buys over a sample library: no licence to track, and sound that
+cannot drift out of sync, because picture and audio come from the same numbers.
+It also catches content bugs -- counting audible pass-bys is how the oncoming
+traffic layout was found to be running dry after a few seconds.
+
+### Narration
+
+Kokoro-82M, Apache 2.0, 53 voices, about 6x realtime on an M-series Mac with no
+GPU contention against Blender. `uv venv .ttsvenv && uv pip install --python
+.ttsvenv/bin/python kokoro soundfile`. Its G2P shells out to `uv` for a spaCy
+model on first run, so `VIRTUAL_ENV` must be set or that install fails.
+
+### Music, if it is ever wanted
+
+Licence matters more than quality here, because the weights' licence follows
+the output:
+
+| model | licence | note |
+| --- | --- | --- |
+| ACE-Step | Apache 2.0 | the permissive pick; vocals and instrumentals |
+| Stable Audio Open | Stability Community | commercial under $1M revenue; CC0/CC-BY training data |
+| YuE2-3B | CC BY-NC 4.0 | **non-commercial**; CUDA-first, community MLX ports for Mac |
+| MusicGen | CC BY-NC 4.0 | **non-commercial**, even self-hosted |
+
 ## MCP server
 
 Other agents drive the renderer over MCP rather than shelling out to Python,

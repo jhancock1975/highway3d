@@ -1002,18 +1002,25 @@ class Traffic:
         # --- lay traffic out lane by lane, already spaced, so nothing starts
         # --- inside anything else
         plan = []
+        # Oncoming traffic travels the other way, so its x maps to s = -x.
+        # Laying it out over the same range as same-direction traffic puts it
+        # all behind the viewpoint, and the stream dries up a few seconds in.
+        # It has to start far enough ahead that cars keep arriving: a car is
+        # met when s0 = v*WARMUP + 2*v*t, so cover v*(WARMUP + 2*duration).
+        reach = cfg["speed"] * (WARMUP + 2.0 * cfg["duration"]) + 500.0
         for oncoming in (False, True):
             for lane in range(LANES):
                 # outer lanes run slower, as they do in life
                 lane_speed = cfg["speed"] * (1.12 - 0.11 * lane)
-                x = -380.0
-                while x < span:
+                x = -reach if oncoming else -380.0
+                x_end = 200.0 if oncoming else span
+                while x < x_end:
                     kind = rng.choice(kinds)
                     ln = lengths[kind]
                     # equilibrium headway for this speed, plus a random extra
                     x += (ln + MIN_GAP + lane_speed * REACT
                           + rng.expovariate(1.0 / 30.0))
-                    if x >= span:
+                    if x >= x_end:
                         break
                     v0 = lane_speed * rng.uniform(0.94, 1.07)
                     plan.append(dict(kind=kind, lane=lane, oncoming=oncoming,
