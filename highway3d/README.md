@@ -316,8 +316,14 @@ the output:
 | --- | --- | --- |
 | ACE-Step | Apache 2.0 | the permissive pick; vocals and instrumentals |
 | Stable Audio Open | Stability Community | commercial under $1M revenue; CC0/CC-BY training data |
-| YuE2-3B | CC BY-NC 4.0 | **non-commercial**; CUDA-first, community MLX ports for Mac |
+| YuE2-3B | CC BY-NC 4.0 | **rejected** -- see below |
 | MusicGen | CC BY-NC 4.0 | **non-commercial**, even self-hosted |
+
+YuE2-3B was evaluated and dropped, so it does not need re-litigating. It is a
+lyrics-to-song model, so it cannot narrate at all; its CC BY-NC 4.0 licence
+follows the output and rules out commercial use even self-hosted; and it is
+CUDA-first, needing a 24 GB NVIDIA GPU, with only unofficial community MLX
+ports for Apple Silicon. ACE-Step does the same job under Apache 2.0.
 
 ## MCP server
 
