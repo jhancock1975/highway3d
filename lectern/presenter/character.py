@@ -29,6 +29,12 @@ SHOULDER_W = 0.30
 # The skull's front surface, which everything on the face has to clear.
 FACE_Y = -HEAD_R * 0.94
 
+# The eyelid, and how far it has to grow to cover the eye it caps.
+EYE_R = HEAD_R * 0.255
+LID_R = HEAD_R * 0.285
+LID_TOP = HEAD_R * 0.09 + EYE_R          # world z of the eye's top edge
+LID_FULL = EYE_R / LID_R                 # scale that covers the eye
+
 SKIN = (0.74, 0.52, 0.40, 1.0)
 HAIR = (0.88, 0.88, 0.90, 1.0)
 CARDIGAN = (0.085, 0.100, 0.150, 1.0)
@@ -150,7 +156,12 @@ def build_mouth():
 
 
 def build_eyes():
-    """Proud of the skull, the way a drawn eye is. Buried eyes read as closed."""
+    """Proud of the skull, the way a drawn eye is. Buried eyes read as closed.
+
+    Each eye carries a lid parked just above it, out of shot until it is
+    needed. `animate_blinks` drives the lid down; the eyeball itself no
+    longer changes shape.
+    """
     white = _mat("eye_white", EYE_WHITE, rough=0.18)
     iris = _mat("iris", IRIS, rough=0.22)
     out = []
@@ -164,7 +175,21 @@ def build_eyes():
                     (x * HEAD_R * 0.375, cy - HEAD_R * 0.205, HEAD_R * 0.09),
                     scale=(1.0, 0.42, 1.0), segments=28, rings=16)
         _shade(p, iris)
-        out += [e, p]
+        # An eyelid, because squashing the eyeball is not a blink: flattening
+        # a white sphere reads as the eye shrinking, not closing.
+        #
+        # It grows down from the eye's top edge rather than travelling to it.
+        # A lid parked above the eye has to sit somewhere, and at this scale
+        # anywhere above the eye is outside the skull -- the first version
+        # put a skin-coloured lump on his brow and left him permanently
+        # hooded. Parked at zero height it is a degenerate disc on the top
+        # edge of the eye, which is nothing at all.
+        lid = _sphere(f"lid.{side}", LID_R,
+                      (x * HEAD_R * 0.375, cy - HEAD_R * 0.02,
+                       HEAD_R * 0.09 + HEAD_R * 0.255),
+                      scale=(1.0, 1.0, 0.001), segments=28, rings=16)
+        _shade(lid, _mat("skin", SKIN, rough=0.56))
+        out += [e, p, lid]
     return out
 
 
@@ -344,18 +369,22 @@ def build_body():
     """
     body_root = _empty("body_root", (0, 0, 0))
 
-    chest = _sphere("chest", BODY_H * 0.30, (0, 0, -HEAD_R - BODY_H * 0.34),
-                    scale=(1.12, 0.74, 0.92))
-    waist = _sphere("waist", BODY_H * 0.255, (0, 0.004, -HEAD_R - BODY_H * 0.62),
-                    scale=(1.04, 0.76, 0.86))
+    # An academic, not an athlete. Measured, the old build ran a chest half-
+    # width of 0.263 against a waist of 0.164 -- a taper of 1.61, where an
+    # athletic build is about 1.1 and a man who has spent forty years at a
+    # desk is nearer 0.95. The deltoid caps were the widest thing on him.
+    chest = _sphere("chest", BODY_H * 0.30, (0, -0.012, -HEAD_R - BODY_H * 0.34),
+                    scale=(0.90, 0.80, 0.90))
+    waist = _sphere("waist", BODY_H * 0.255, (0, 0.006, -HEAD_R - BODY_H * 0.60),
+                    scale=(1.22, 0.94, 0.94))
     caps = []
     for side, x in (("L", 1), ("R", -1)):
-        caps.append(_sphere(f"deltoid.{side}", BODY_H * 0.125,
-                            (x * SHOULDER_W * 0.62, -0.004,
-                             -HEAD_R - BODY_H * 0.26),
-                            scale=(1.0, 0.94, 0.86)))
-    hips = _sphere("hips", BODY_H * 0.215, (0, 0.004, HIP_Z + BODY_H * 0.10),
-                   scale=(1.06, 0.82, 0.70))
+        caps.append(_sphere(f"deltoid.{side}", BODY_H * 0.092,
+                            (x * SHOULDER_W * 0.52, -0.004,
+                             -HEAD_R - BODY_H * 0.27),
+                            scale=(1.0, 0.94, 0.82)))
+    hips = _sphere("hips", BODY_H * 0.215, (0, 0.008, HIP_Z + BODY_H * 0.10),
+                   scale=(1.10, 0.90, 0.72))
 
     torso = _join([chest, waist, hips] + caps, "einstein_body")
     rm = torso.modifiers.new("weld", "REMESH")
@@ -372,12 +401,14 @@ def build_body():
         _shade(b, _mat("button", BUTTON, rough=0.42))
         buttons.append(b)
 
-    collar = _sphere("collar", HEAD_R * 0.50, (0, -0.025, -HEAD_R * 1.12),
-                     scale=(1.30, 1.05, 0.50))
+    collar = _sphere("collar", HEAD_R * 0.47, (0, -0.048, -HEAD_R * 1.14),
+                     scale=(1.24, 1.05, 0.50))
     _shade(collar, _mat("shirt", SHIRT, rough=0.74))
 
-    neck = _sphere("neck", HEAD_R * 0.34, (0, 0.006, -HEAD_R * 1.02),
-                   scale=(1.0, 1.0, 0.95))
+    # Forward of the shoulders: a stoop is what forty years of reading does,
+    # and it is most of the difference between a scholar and a swimmer.
+    neck = _sphere("neck", HEAD_R * 0.315, (0, -0.030, -HEAD_R * 1.02),
+                   scale=(1.0, 1.0, 0.98))
     _shade(neck, _mat("skin", SKIN, rough=0.56))
 
     sleeve = _mat("cardigan", CARDIGAN, rough=0.94, sheen=0.6)
@@ -389,20 +420,20 @@ def build_body():
         # chest, so a joint at 0.64 * SHOULDER_W = 0.192 put the whole upper
         # arm inside the cardigan.
         shoulder = _empty(f"shoulder.{side}",
-                          (x * 0.238, -0.010,
-                           -HEAD_R - BODY_H * 0.27), parent=body_root)
+                          (x * 0.203, -0.014,
+                           -HEAD_R - BODY_H * 0.28), parent=body_root)
         # Negative Y swings the arm away from the body. Positive Y takes the
         # left arm (at +x) toward -x, which is straight into the cardigan --
         # the sign here was wrong and every "outward" rotation downstream
         # inherited it.
         shoulder.rotation_euler = (0.06, -x * 0.20, 0)
-        upper = _limb(f"upperarm.{side}", 0.056, 0.046, UPPER_ARM)
+        upper = _limb(f"upperarm.{side}", 0.045, 0.038, UPPER_ARM)
         _shade(upper, sleeve)
         elbow = _empty(f"elbow.{side}", (0, 0, -UPPER_ARM))
-        fore = _limb(f"forearm.{side}", 0.046, 0.038, FOREARM)
+        fore = _limb(f"forearm.{side}", 0.038, 0.032, FOREARM)
         _shade(fore, sleeve)
         wrist = _empty(f"wrist.{side}", (0, 0, -FOREARM))
-        hand = _limb(f"hand.{side}", 0.040, 0.030, HAND_L, segments=18, rings=10)
+        hand = _limb(f"hand.{side}", 0.035, 0.027, HAND_L, segments=18, rings=10)
         hand.scale = (1.0, 0.62, 1.0)
         _shade(hand, skin)
         thumb = _limb(f"thumb.{side}", 0.017, 0.013, 0.040, segments=12, rings=8)

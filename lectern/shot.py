@@ -63,8 +63,8 @@ def animate_blinks(parts, n_frames, fps, seed=11, words=None):
     alive behind the face, and it costs four keyframes each.
     """
     rng = random.Random(seed)
-    eyes = [o for o in parts["all"] if o.name.startswith(("eye.", "iris."))]
-    base = {o.name: tuple(o.scale) for o in eyes}
+    lids = [o for o in parts["all"] if o.name.startswith("lid.")]
+    rest = {o.name: (tuple(o.location), tuple(o.scale)) for o in lids}
 
     moments = []
     t = rng.uniform(0.6, 2.0)
@@ -76,18 +76,29 @@ def animate_blinks(parts, n_frames, fps, seed=11, words=None):
         if w["text"].strip() in {".", "?", "!"}:
             moments.append(w["end"] + rng.uniform(0.02, 0.14))
 
-    for o in eyes:
-        bx, by, bz = base[o.name]
-        o.scale = (bx, by, bz)
+    def lid_at(o, k):
+        """k from 0 (open) to 1 (shut), growing down from the eye's top edge."""
+        (lx, ly, lz), (sx, sy, _) = rest[o.name]
+        h = character.LID_R * character.LID_FULL * k
+        o.scale = (sx, sy, max(0.001, character.LID_FULL * k))
+        o.location = (lx, ly, character.LID_TOP - h)
+
+    for o in lids:
+        lid_at(o, 0.0)
+        o.keyframe_insert("location", frame=1)
         o.keyframe_insert("scale", frame=1)
+    # A human blink runs 100-150 ms and closes faster than it opens. At 24 fps
+    # the old three-key blink spent about one frame closed -- 42 ms -- which
+    # is quick enough to miss entirely.
     for t in sorted(moments):
         mid = int(t * fps) + 1
-        if mid < 2 or mid > n_frames - 2:
+        if mid < 3 or mid > n_frames - 4:
             continue
-        for o in eyes:
-            bx, by, bz = base[o.name]
-            for frame, k in ((mid - 2, 1.0), (mid, 0.06), (mid + 2, 1.0)):
-                o.scale = (bx, by, bz * k)
+        for o in lids:
+            for frame, k in ((mid - 2, 0.0), (mid, 1.0), (mid + 1, 1.0),
+                             (mid + 4, 0.0)):
+                lid_at(o, k)
+                o.keyframe_insert("location", frame=frame)
                 o.keyframe_insert("scale", frame=frame)
 
 
