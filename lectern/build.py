@@ -237,21 +237,75 @@ def render_shots(doc, narrated, work, quality, width, height,
 # against an older look are rebuilt rather than silently reused. 7: the
 # presenter gained articulated arms and legs, the camera framings opened up
 # to hold a whole figure, and the body is animated. 8: the arms swing away
-# from the body rather than into it.
-CHARACTER_VERSION = 8
+# from the body rather than into it. 9: he walks to the board and points at
+# what is written on it.
+CHARACTER_VERSION = 9
 
 
-def assemble(shots, out, work) -> None:
+def assemble(shots, out, work, music=None) -> None:
     listing = os.path.join(work, "shots.txt")
     with open(listing, "w") as fh:
         for s in shots:
             fh.write(f"file '{os.path.abspath(s)}'\n")
+    joined = out if not music else os.path.join(work, "_joined.mp4")
     r = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0",
-         "-i", listing, "-c", "copy", "-movflags", "+faststart", out],
+         "-i", listing, "-c", "copy", "-movflags", "+faststart", joined],
         capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(f"assembly failed: {r.stderr.strip()[-400:]}")
+    if music:
+        score_under(joined, out, work, music)
+
+
+def duration_of(path: str) -> float:
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                        "format=duration", "-of", "csv=p=0", path],
+                       capture_output=True, text=True)
+    return float(r.stdout.strip())
+
+
+def score_under(joined: str, out: str, work: str, music: dict) -> None:
+    """Lay a written score under the finished lecture, ducked by the speech.
+
+    The score is one continuous piece across the whole film rather than one
+    per shot: music that restarts at every cut is worse than no music, and
+    the shots are only cut apart because rendering is, not because the
+    picture is.
+
+    Ducking is `sidechaincompress` with the voice as the key, which is how
+    it is done rather than by mixing at a level low enough to be safe. A bed
+    quiet enough never to trouble the words is also quiet enough not to be
+    there; ducked, it can sit up in the gaps and drop away under speech.
+    """
+    seconds = duration_of(joined)
+    mood = music.get("mood", "night")
+    level = float(music.get("level", 0.13))
+    key = digest(mood, round(seconds, 2), music.get("seed", 11))
+    wav = os.path.join(work, f"score-{key}.wav")
+    if not os.path.exists(wav):
+        r = subprocess.run(
+            [TTSVENV, "-m", "lectern.score", "--duration", f"{seconds:.3f}",
+             "--out", wav, "--mood", mood,
+             "--seed", str(music.get("seed", 11))],
+            cwd=HERE, capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(
+                "score failed: " + (r.stderr or r.stdout).strip()[-400:])
+    chain = (f"[1:a]volume={level}[m];"
+             f"[m][0:a]sidechaincompress=threshold=0.03:ratio=9:"
+             f"attack=12:release=320[duck];"
+             f"[duck][0:a]amix=inputs=2:normalize=0[mix]")
+    r = subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-i", joined, "-i", wav,
+         "-filter_complex", chain, "-map", "0:v", "-map", "[mix]",
+         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+         "-movflags", "+faststart", out],
+        capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"scoring failed: {r.stderr.strip()[-400:]}")
+    progress("scoring", 1, 1, mood=mood, level=level,
+             minutes=round(seconds / 60, 2))
 
 
 def main():
@@ -301,7 +355,7 @@ def main():
         notation = write_notation(doc, narrated, work)
         shots = render_shots(doc, narrated, work, a.quality, a.width, a.height,
                              notation)
-        assemble(shots, a.out, work)
+        assemble(shots, a.out, work, doc.get("music"))
 
         hours = (time.time() - began) / 3600
         print("DONE " + json.dumps(dict(
