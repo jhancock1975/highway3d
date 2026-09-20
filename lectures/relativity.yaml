@@ -5,6 +5,9 @@ voice:
   speed: 0.94
 look: study
 fps: 24
+music:
+  mood: night
+  level: 0.13
 chapters:
 - title: A Problem Nobody Wanted
   segments:

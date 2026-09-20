@@ -14,6 +14,7 @@ import os
 
 from lectern.delivery import (BEAT_NAMES, NAMES as DELIVERY_NAMES,
                               infer as infer_delivery)
+from lectern.score import MOODS as MUSIC_MOODS
 
 # Re-exported so the MCP server checks against the same table the
 # renderer animates from, rather than a copy of it.
@@ -45,6 +46,10 @@ KNOWN_DEMOS = _known_demos()
 DEFAULTS = dict(presenter="einstein", look="study", fps=24,
                 voice=dict(preset="einstein", speed=0.94))
 
+# Absent from a document means no music at all, which is a real choice and
+# has to stay the default: silence under a lecture is not a bug.
+MUSIC_DEFAULTS = dict(mood="night", level=0.13, seed=11)
+
 
 class ScriptError(ValueError):
     """A document that cannot be rendered, with the reason in words."""
@@ -64,6 +69,8 @@ def normalise(doc: dict) -> dict:
     out = dict(DEFAULTS)
     out.update(doc)
     out["voice"] = dict(DEFAULTS["voice"], **(doc.get("voice") or {}))
+    if doc.get("music") is not None:
+        out["music"] = dict(MUSIC_DEFAULTS, **(doc.get("music") or {}))
     chapters = out.get("chapters") or []
     for c in chapters:
         c.setdefault("segments", [])
@@ -105,6 +112,19 @@ def validate(doc: dict, demos=None) -> list[str]:
         problems.append("The lecture has no title.")
     if not doc.get("chapters"):
         problems.append("The lecture has no chapters.")
+
+    music = doc.get("music")
+    if music is not None:
+        if music.get("mood") not in MUSIC_MOODS:
+            problems.append(
+                f"The lecture asks for the musical mood "
+                f"'{music.get('mood')}', which does not exist. Use one of: "
+                f"{', '.join(MUSIC_MOODS)}.")
+        lvl = music.get("level", 0)
+        if not isinstance(lvl, (int, float)) or not 0.0 < lvl <= 1.0:
+            problems.append(
+                f"The music level is {lvl!r}; it wants to be between 0 and 1, "
+                f"and about 0.13 for a bed under speech.")
 
     for i, seg in enumerate(segments(doc)):
         where = f"segment {i} (chapter {seg['chapter'] + 1})"

@@ -168,6 +168,227 @@ def staged_extent(objects, n_frames, step=6):
     return (lo, hi) if hi > lo else (None, None)
 
 
+def board_lines(board, frames_dir, min_gap=14):
+    """Where each line of chalk actually sits, in world space.
+
+    Read off the rendered notation rather than predicted from the layout.
+    Manim decides where the heading and each line land, the board is a plane
+    with the result mapped across it, and anything that recomputed those
+    positions here would be a second layout engine to keep in step with the
+    first.
+
+    Returns a list of (x, z) world points, topmost first: the heading, then
+    each line.
+    """
+    import numpy as np
+
+    have = sorted(f for f in os.listdir(frames_dir) if f.endswith(".png"))
+    if not have:
+        return []
+    img = bpy.data.images.load(os.path.join(frames_dir, have[-1]))
+    try:
+        w, h = img.size
+        px = np.empty(w * h * 4, dtype=np.float32)
+        img.pixels.foreach_get(px)
+        alpha = px.reshape(h, w, 4)[:, :, 3]
+    finally:
+        bpy.data.images.remove(img)
+
+    # Blender samples images bottom-up, so row 0 of this array is the bottom
+    # of the board. Keep it that way and convert at the end.
+    ink = alpha > 0.15
+    rows = ink.any(axis=1)
+    bands = []
+    start = None
+    for i, on in enumerate(rows):
+        if on and start is None:
+            start = i
+        elif not on and start is not None:
+            if i - start >= 2:
+                bands.append((start, i))
+            start = None
+    if start is not None:
+        bands.append((start, len(rows)))
+
+    merged = []
+    for b in bands:
+        if merged and b[0] - merged[-1][1] < min_gap:
+            merged[-1] = (merged[-1][0], b[1])
+        else:
+            merged.append(list(b) if False else (b[0], b[1]))
+
+    corners = [board.matrix_world @ Vector(c) for c in board.bound_box]
+    x0 = min(c.x for c in corners); x1 = max(c.x for c in corners)
+    z0 = min(c.z for c in corners); z1 = max(c.z for c in corners)
+
+    out = []
+    for lo, hi in merged:
+        band = ink[lo:hi]
+        cols = np.where(band.any(axis=0))[0]
+        if not len(cols):
+            continue
+        u = (cols.min() + cols.max()) / 2.0 / w
+        v = (lo + hi) / 2.0 / h
+        out.append((x0 + u * (x1 - x0), z0 + v * (z1 - z0)))
+    out.sort(key=lambda p: -p[1])          # topmost first
+    return out
+
+
+STEP_LENGTH = 0.30          # metres of ground covered per step
+TURN = 0.95                 # radians he turns toward his line of travel
+
+
+def walk(parts, t0, t1, x0, x1, fps, n_frames, seed=5):
+    """Move him from x0 to x1 on his own legs, without the feet sliding.
+
+    The root follows the feet, not the other way round. Swinging pendulum
+    legs under a root that translates on its own schedule cannot hold a foot
+    still: the two only agree instantaneously, and measured over a 0.62 m
+    walk the planted foot dragged 600 mm of it. So each frame plants the
+    stance foot, evaluates where the rig actually puts it, and slides the
+    root by whatever is left over. That makes a still foot an invariant
+    rather than something the numbers happen to produce.
+
+    He also turns to face his line of travel. The legs swing about their own
+    X, which carries the feet along his Y, so a figure that walks sideways
+    without turning is moonwalking -- and a partial turn cannot be made
+    slip-free at all, because then his stride axis and his travel are
+    different directions.
+    """
+    stand = parts["stand"]
+    legs = parts["legs"]
+    arms = parts["arms"]
+    dist = abs(x1 - x0)
+    dur = max(1e-3, t1 - t0)
+    if dist < 1e-3:
+        return
+    steps = max(1, int(round(dist / STEP_LENGTH)))
+    stride = dist / steps
+    # One sine cycle is two footfalls, one per leg, so the cycle rate is
+    # half the step rate. Counting them as the same thing walked him twice
+    # as far as asked -- 1.43 m for a 0.62 m journey -- with the feet
+    # planted perfectly the whole way, because the root was faithfully
+    # following a gait that was simply doing too much.
+    freq = (steps / 2.0) / dur
+    f0, f1 = int(t0 * fps) + 1, int(t1 * fps) + 1
+
+    hip_z = legs["L"]["hip"].matrix_world.translation.z
+    shoe0 = legs["L"]["shoe"]
+    sole = min((shoe0.matrix_world @ v.co).z for v in shoe0.data.vertices)
+    leg_len = max(0.05, hip_z - sole)
+    theta = math.asin(min(0.85, stride / (2.0 * leg_len)))
+
+    face = math.copysign(math.pi / 2.0, x1 - x0)
+
+    # Turn in place, stride, turn back. Turning while striding rotates the
+    # planted foot about the root, and the correction then translates to
+    # compensate, which quietly adds distance -- measured at 0.77 m for a
+    # 0.62 m journey. Separated, the two never interact.
+    turn_t = min(0.42, dur * 0.18)
+    s0, s1 = t0 + turn_t, t1 - turn_t
+    stride_dur = max(1e-3, s1 - s0)
+    freq = (steps / 2.0) / stride_dur
+
+    def foot_x(side):
+        shoe = legs[side]["shoe"]
+        pts = [shoe.matrix_world @ v.co for v in shoe.data.vertices]
+        return sum(p.x for p in pts) / len(pts)
+
+    def set_legs(ph, moving, th):
+        for side, sgn in (("L", 1.0), ("R", -1.0)):
+            a = -th * math.sin(ph) * sgn if moving else 0.0
+            legs[side]["hip"].rotation_euler = (a, 0.0, 0.0)
+            legs[side]["knee"].rotation_euler = (max(0.0, -1.4 * a), 0.0, 0.0)
+            sh0 = (0.06, -(1.0 if side == "L" else -1.0) * 0.20, 0.0)
+            arms[side]["shoulder"].rotation_euler = (sh0[0] - 0.68 * a,
+                                                     sh0[1], sh0[2])
+
+    # One dry pass to see how far this gait actually carries him, then the
+    # real one with the swing scaled to land on the mark. The arithmetic
+    # says a stance run advances him 2*L*sin(theta) and two of them make a
+    # cycle, but the hand-over between them absorbs a little more, and the
+    # measured overshoot was 0.14 m in 0.62. Measuring it costs one extra
+    # pass of a loop that is already cheap; predicting it costs a snap at
+    # the end of every walk, which is the one thing the eye always catches.
+    def sweep(th, commit):
+        x = x0
+        planted_side = planted_x = None
+        for frame in range(max(1, f0), min(n_frames, f1) + 1):
+            t = (frame - 1) / fps
+            if t < s0:
+                turn, ph, moving = (t - t0) / max(1e-3, turn_t), 0.0, False
+            elif t > s1:
+                turn, ph, moving = (t1 - t) / max(1e-3, turn_t), 0.0, False
+            else:
+                turn, moving = 1.0, True
+                ph = 2.0 * math.pi * freq * (t - s0)
+            turn = min(1.0, max(0.0, turn))
+            turn = turn * turn * (3.0 - 2.0 * turn)
+            set_legs(ph, moving, th)
+            stand.rotation_euler = (0.0, 0.0, face * turn)
+            stand.location = (x, stand.location.y, 0.0)
+            bpy.context.view_layer.update()
+            if moving:
+                stance = "L" if math.cos(ph) < 0.0 else "R"
+                if stance != planted_side:
+                    planted_side, planted_x = stance, foot_x(stance)
+                else:
+                    x += planted_x - foot_x(stance)
+                    stand.location = (x, stand.location.y, 0.0)
+                    bpy.context.view_layer.update()
+            else:
+                planted_side = None
+            if commit:
+                body = parts["body_root"]
+                body.location = (body.location.x, body.location.y,
+                                 0.016 * abs(math.sin(ph)) if moving else 0.0)
+                stand.keyframe_insert("location", frame=frame)
+                stand.keyframe_insert("rotation_euler", frame=frame)
+                body.keyframe_insert("location", frame=frame)
+                for side in ("L", "R"):
+                    legs[side]["hip"].keyframe_insert("rotation_euler",
+                                                      frame=frame)
+                    legs[side]["knee"].keyframe_insert("rotation_euler",
+                                                       frame=frame)
+                    arms[side]["shoulder"].keyframe_insert("rotation_euler",
+                                                           frame=frame)
+        return x
+
+    reached = sweep(theta, False)
+    got = abs(reached - x0)
+    if got > 1e-4:
+        theta = math.asin(min(0.85, math.sin(theta) * dist / got))
+    x = sweep(theta, True)
+
+    # The gait decides how far he got; land him where he was asked to be.
+    stand.location = (x1, stand.location.y, 0.0)
+    stand.rotation_euler = (0.0, 0.0, 0.0)
+    stand.keyframe_insert("location", frame=min(n_frames, f1))
+    stand.keyframe_insert("rotation_euler", frame=min(n_frames, f1))
+    return dict(steps=steps, stride=stride, theta=theta, freq=freq,
+                stride_window=(s0, s1), arrived=x, asked=x1)
+
+
+def aim_arm_at(arm, target, torso, sgn):
+    """Point the whole arm at a world position, elbow nearly straight.
+
+    A point is a line from the shoulder to the thing. Working out the two
+    joint angles that produce that line by hand is how you get an arm that
+    indicates a spot near the thing; asking for the direction and letting
+    `to_track_quat` solve it is exact, and it stays exact when the figure
+    moves or the board's writing lands somewhere else.
+    """
+    shoulder = arm["shoulder"]
+    world = shoulder.matrix_world.translation
+    direction = (Vector(target) - world).normalized()
+    parent = shoulder.parent
+    if parent is not None:
+        direction = parent.matrix_world.to_3x3().inverted() @ direction
+    rot = direction.to_track_quat("-Z", "Y").to_euler()
+    el = (0.04, 0.0, 0.0)
+    return clear_of_torso(arm, torso, (rot.x, rot.y, rot.z), el, sgn)
+
+
 def pierce_depth(obj, torso) -> float:
     """How far the deepest vertex of `obj` sits inside `torso`, in metres."""
     inv = torso.matrix_world.inverted()
@@ -209,7 +430,7 @@ def clear_of_torso(arm, torso, sh, el, sgn, step=0.06, tries=12):
 
 
 def animate_body(parts, n_frames, fps, seed=17, words=None, focus=None,
-                 beat=""):
+                 beat="", board=None):
     """Breath, weight and gesture -- the half of the performance that was
     missing.
 
@@ -282,12 +503,17 @@ def animate_body(parts, n_frames, fps, seed=17, words=None, focus=None,
     spoken = [w["start"] for w in (words or [])
               if len(w["text"].strip()) > 3]
     last_end = n_frames / fps - 1.1
+    # While he is at the board the arms are busy pointing, so no gesture is
+    # scheduled inside that window; two performances driving the same two
+    # joints would simply overwrite one another's keyframes.
+    busy = board["window"] if board else None
     moments, t = [], rng.uniform(0.7, 1.5)
     while t < last_end:
         nxt = next((w for w in spoken if w >= t), None)
         if nxt is None or nxt > last_end:
             break
-        moments.append(nxt)
+        if not (busy and busy[0] - 0.8 <= nxt <= busy[1] + 0.8):
+            moments.append(nxt)
         t = nxt + rng.uniform(2.4, 4.6)
 
     KINDS = ("beat", "beat", "beat", "present", "open", "count")
@@ -343,6 +569,65 @@ def animate_body(parts, n_frames, fps, seed=17, words=None, focus=None,
         key(a["elbow"], t0 + 0.30 + hold, el, lag=2)
         key(a["shoulder"], t0 + 0.30 + hold + 0.55, sh0)
         key(a["elbow"], t0 + 0.30 + hold + 0.55, el0, lag=3)
+
+    if board:
+        perform_at_board(parts, board, fps, n_frames, torso_mesh)
+
+
+def perform_at_board(parts, board, fps, n_frames, torso):
+    """Walk to the board, indicate two of the lines on it, and come back.
+
+    He used to deliver a whole lecture rooted to one spot. A presenter who
+    never approaches the thing he is talking about is reading aloud near a
+    chalkboard rather than teaching from one.
+
+    Which lines he points at comes from `board_lines`, which reads them off
+    the rendered notation. Nothing here knows how Manim lays a board out,
+    and nothing here should.
+    """
+    lines = board["lines"]
+    if not lines:
+        return
+    t0, t1 = board["window"]
+    home, near = board["home_x"], board["near_x"]
+    arms = parts["arms"]
+    # The arm nearer the board does the pointing; the board is to his left
+    # in every framing that has one.
+    side = "R" if near > lines[0][0] else "L"
+    arm = arms[side]
+    sgn = arm["sign"]
+    rest_sh = tuple(arm["shoulder"].rotation_euler)
+    rest_el = (0.22, 0.0, 0.0)
+
+    out_t = (t0, t0 + 1.1)
+    back_t = (t1 - 1.1, t1)
+    walk(parts, out_t[0], out_t[1], home, near, fps, n_frames)
+
+    span = back_t[0] - out_t[1]
+    picks = [lines[0], lines[min(len(lines) - 1, 2)]] if len(lines) > 1 \
+        else [lines[0]]
+    hold = span / max(1, len(picks))
+    for i, (lx, lz) in enumerate(picks):
+        a0 = out_t[1] + i * hold
+        sh, el = aim_arm_at(arm, (lx, 1.30, lz), torso, sgn)
+        for t, pose in ((a0 + 0.02, (rest_sh, rest_el)),
+                        (a0 + 0.34, (sh, el)),
+                        (a0 + hold - 0.30, (sh, el))):
+            f = int(t * fps) + 1
+            if 1 <= f <= n_frames:
+                arm["shoulder"].rotation_euler = pose[0]
+                arm["elbow"].rotation_euler = pose[1]
+                arm["shoulder"].keyframe_insert("rotation_euler", frame=f)
+                arm["elbow"].keyframe_insert("rotation_euler", frame=f)
+    f = int((back_t[0] - 0.15) * fps) + 1
+    if 1 <= f <= n_frames:
+        arm["shoulder"].rotation_euler = rest_sh
+        arm["elbow"].rotation_euler = rest_el
+        arm["shoulder"].keyframe_insert("rotation_euler", frame=f)
+        arm["elbow"].keyframe_insert("rotation_euler", frame=f)
+
+    walk(parts, back_t[0], back_t[1], near, home, fps, n_frames)
+
 
 
 def _fcurves(action):
@@ -496,6 +781,7 @@ def render_one(job: dict, opt) -> dict:
 
     demo_fit = 0.0
     demo_target = None
+    board_plan = None
     if demo:
         # Far enough left that he clears the writing on the board behind him.
         # Measured rather than nudged: the notation image puts its ink between
@@ -530,6 +816,15 @@ def render_one(job: dict, opt) -> dict:
         # anybody writing on one does.
         parts["stand"].location = (0.52, 0.16, 0.0)
         focus = Vector((-0.62, 1.20, 0.26))
+        # Long enough to be worth crossing the room for. Under about twelve
+        # seconds he would arrive, point once and set off back, which reads
+        # as pacing rather than as teaching.
+        seconds = n_frames / opt.fps
+        if seconds >= 12.0:
+            lines = board_lines(scene_parts["board"], notation)
+            if lines:
+                board_plan = dict(lines=lines, home_x=0.52, near_x=0.22,
+                                  window=(seconds * 0.24, seconds * 0.82))
 
     # Aim between him and the thing he is presenting, not at either.
     # z well below his eyeline: he is a whole figure now rather than a bust,
@@ -548,7 +843,7 @@ def render_one(job: dict, opt) -> dict:
     animate_blinks(parts, n_frames, opt.fps, words=words)
     animate_head(parts, n_frames, opt.fps, words=words, look_at=focus)
     animate_body(parts, n_frames, opt.fps, words=words, focus=focus,
-                 beat=job.get("beat", ""))
+                 beat=job.get("beat", ""), board=board_plan)
     ease_interpolation()
 
     frames_dir = job.get("frames_dir") or os.path.join(
