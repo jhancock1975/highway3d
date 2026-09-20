@@ -259,11 +259,20 @@ def assemble(shots, out, work, music=None) -> None:
         score_under(joined, out, work, music)
 
 
-def duration_of(path: str) -> float:
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
-                        "format=duration", "-of", "csv=p=0", path],
-                       capture_output=True, text=True)
-    return float(r.stdout.strip())
+def duration_of(path: str, stream: str = "") -> float:
+    """The container's duration, or one stream's when asked.
+
+    They are not the same number here and the difference matters: the
+    picture is the master, and the audio decodes longer than it.
+    """
+    args = ["ffprobe", "-v", "error"]
+    if stream:
+        args += ["-select_streams", stream, "-show_entries", "stream=duration"]
+    else:
+        args += ["-show_entries", "format=duration"]
+    args += ["-of", "csv=p=0", path]
+    r = subprocess.run(args, capture_output=True, text=True)
+    return float(r.stdout.strip().rstrip(","))
 
 
 def score_under(joined: str, out: str, work: str, music: dict) -> None:
@@ -297,10 +306,19 @@ def score_under(joined: str, out: str, work: str, music: dict) -> None:
              f"[m][0:a]sidechaincompress=threshold=0.03:ratio=9:"
              f"attack=12:release=320[duck];"
              f"[duck][0:a]amix=inputs=2:normalize=0[mix]")
+    # Cut to the picture. Each shot's AAC carries the encoder's priming and
+    # padding, and concatenating 82 of them hides 64.5 ms apiece inside the
+    # stream -- 5.29 seconds of it. Copying the audio through, as assembly
+    # did before there was any music, left that as stream metadata for a
+    # player to trim. Decoding it to mix a score under turns every one of
+    # those samples into real audio, and the film ended with five seconds of
+    # music playing over a picture that had already stopped.
+    picture = duration_of(joined, "v:0")
     r = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", joined, "-i", wav,
          "-filter_complex", chain, "-map", "0:v", "-map", "[mix]",
          "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+         "-t", f"{picture:.4f}",
          "-movflags", "+faststart", out],
         capture_output=True, text=True)
     if r.returncode != 0:
