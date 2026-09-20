@@ -1,8 +1,20 @@
-# generated video and stills
+# generated video, stills and audio -- this project's output is binary and
+# large, and none of it belongs in git. 378 MB of unreachable WAV objects
+# were sitting in the pack from staging that never reached a commit.
 renders/
 *.mp4
-*.png
 *.mov
+*.mkv
+*.webm
+*.avi
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.wav
+*.mp3
+*.aac
+*.flac
 
 # downloaded CC0 assets, refetched by highway3d/setup.sh
 assets/
@@ -18,9 +30,41 @@ __pycache__/
 # editor leftovers
 *~
 
-# intermediate audio and per-segment scratch
-*.wav
+# intermediate per-segment scratch
 .work/
+
+# 3D assets and model weights -- fetched or generated, never authored here
+*.blend
+*.blend[0-9]*
+*.glb
+*.gltf
+*.fbx
+*.obj
+*.exr
+*.hdr
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# compiled objects and archives
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# python packaging and any vendored library tree
+site-packages/
+node_modules/
+*.egg-info/
+*.whl
+build/
+dist/
 
 # macOS
 .DS_Store
