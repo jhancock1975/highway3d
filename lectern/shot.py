@@ -168,6 +168,46 @@ def staged_extent(objects, n_frames, step=6):
     return (lo, hi) if hi > lo else (None, None)
 
 
+def pierce_depth(obj, torso) -> float:
+    """How far the deepest vertex of `obj` sits inside `torso`, in metres."""
+    inv = torso.matrix_world.inverted()
+    worst = 0.0
+    for v in obj.data.vertices:
+        local = inv @ (obj.matrix_world @ v.co)
+        ok, loc, nor, _ = torso.closest_point_on_mesh(local)
+        if not ok:
+            continue
+        d = local - loc
+        if d.dot(nor) < 0.0:               # on the inside of the surface
+            worst = max(worst, d.length)
+    return worst
+
+
+def clear_of_torso(arm, torso, sh, el, sgn, step=0.06, tries=12):
+    """Swing the arm out until the hand and forearm are outside the body.
+
+    A clamp, not a tuned constant, for the reason the traffic simulation in
+    the highway renderer has one: a set of angles that happens to clear today
+    is not an invariant, and this particular failure is silent. The hand
+    renders inside the cardigan, every frame encodes, every check passes,
+    and it is only ever caught by somebody watching the film.
+
+    Measured before it was fixed: `present`, which is the opening gesture of
+    every shot, put the hand 37 mm and the forearm 61 mm inside the torso.
+    `open` was 75 mm and 99 mm.
+    """
+    for _ in range(tries):
+        arm["shoulder"].rotation_euler = sh
+        arm["elbow"].rotation_euler = el
+        bpy.context.view_layer.update()
+        deep = max(pierce_depth(arm["hand"], torso),
+                   pierce_depth(arm["fore"], torso))
+        if deep <= 0.002:
+            return sh, el
+        sh = (sh[0], sh[1] - sgn * step, sh[2])
+    return sh, el
+
+
 def animate_body(parts, n_frames, fps, seed=17, words=None, focus=None,
                  beat=""):
     """Breath, weight and gesture -- the half of the performance that was
@@ -192,6 +232,7 @@ def animate_body(parts, n_frames, fps, seed=17, words=None, focus=None,
     torso = parts["torso"]
     arms = parts["arms"]
 
+    torso_mesh = parts["torso"]
     rest = {side: (tuple(a["shoulder"].rotation_euler), (0.22, 0.0, 0.0))
             for side, a in arms.items()}
     for side, a in arms.items():
@@ -264,24 +305,26 @@ def animate_body(parts, n_frames, fps, seed=17, words=None, focus=None,
         sgn = a["sign"]
         sh0, el0 = rest[use]
 
+        # Minus sgn, not plus: this is the direction away from the body.
         if kind == "beat":
             sh = (sh0[0] - 0.30, sh0[1], sh0[2])
             el = (el0[0] + 0.55, 0.0, sgn * 0.10)
         elif kind == "present":
-            sh = (sh0[0] - 0.52, sh0[1] + sgn * 0.30, sh0[2] - sgn * 0.16)
+            sh = (sh0[0] - 0.52, sh0[1] - sgn * 0.30, sh0[2] - sgn * 0.16)
             el = (el0[0] + 0.34, 0.0, sgn * 0.26)
         elif kind == "point":
             # Arm further out and the elbow nearly straight: a point reads as
             # a line from the shoulder to the thing, and a bent elbow breaks
             # the line.
-            sh = (sh0[0] - 0.74, sh0[1] + sgn * 0.22, sh0[2] - sgn * 0.20)
+            sh = (sh0[0] - 0.74, sh0[1] - sgn * 0.22, sh0[2] - sgn * 0.20)
             el = (el0[0] - 0.14, 0.0, sgn * 0.06)
         elif kind == "open":
-            sh = (sh0[0] - 0.38, sh0[1] + sgn * 0.44, sh0[2])
+            sh = (sh0[0] - 0.38, sh0[1] - sgn * 0.44, sh0[2])
             el = (el0[0] + 0.30, 0.0, sgn * 0.34)
         else:                                       # count: hand up, held
             sh = (sh0[0] - 0.66, sh0[1], sh0[2])
             el = (el0[0] + 0.95, 0.0, sgn * 0.05)
+        sh, el = clear_of_torso(a, torso_mesh, sh, el, sgn)
 
         def blend(r0, r1, k):
             return tuple(x + (y - x) * k for x, y in zip(r0, r1))

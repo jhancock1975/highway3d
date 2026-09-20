@@ -391,7 +391,11 @@ def build_body():
         shoulder = _empty(f"shoulder.{side}",
                           (x * 0.238, -0.010,
                            -HEAD_R - BODY_H * 0.27), parent=body_root)
-        shoulder.rotation_euler = (0.06, x * 0.13, 0)
+        # Negative Y swings the arm away from the body. Positive Y takes the
+        # left arm (at +x) toward -x, which is straight into the cardigan --
+        # the sign here was wrong and every "outward" rotation downstream
+        # inherited it.
+        shoulder.rotation_euler = (0.06, -x * 0.20, 0)
         upper = _limb(f"upperarm.{side}", 0.056, 0.046, UPPER_ARM)
         _shade(upper, sleeve)
         elbow = _empty(f"elbow.{side}", (0, 0, -UPPER_ARM))

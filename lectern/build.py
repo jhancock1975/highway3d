@@ -236,8 +236,9 @@ def render_shots(doc, narrated, work, quality, width, height,
 # Bumped whenever the presenter or the set changes shape, so shots cached
 # against an older look are rebuilt rather than silently reused. 7: the
 # presenter gained articulated arms and legs, the camera framings opened up
-# to hold a whole figure, and the body is animated.
-CHARACTER_VERSION = 7
+# to hold a whole figure, and the body is animated. 8: the arms swing away
+# from the body rather than into it.
+CHARACTER_VERSION = 8
 
 
 def assemble(shots, out, work) -> None:
