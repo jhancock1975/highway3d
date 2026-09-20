@@ -238,8 +238,9 @@ def render_shots(doc, narrated, work, quality, width, height,
 # presenter gained articulated arms and legs, the camera framings opened up
 # to hold a whole figure, and the body is animated. 8: the arms swing away
 # from the body rather than into it. 9: he walks to the board and points at
-# what is written on it.
-CHARACTER_VERSION = 9
+# what is written on it. 10: an academic build rather than an athletic one,
+# and eyelids.
+CHARACTER_VERSION = 10
 
 
 def assemble(shots, out, work, music=None) -> None:
