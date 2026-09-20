@@ -81,9 +81,14 @@ def _figure(made, x, seed=3):
     # the near arm carries on down to the crank; the far one stops at the elbow
     fore = rod("fig.fore", 0.042, 0.22, (x + 0.245, FIG_Y - 0.175, -0.470),
                coat)
-    fore.rotation_euler = (1.02, 0.0, 0.0)
+    fore.rotation_euler = (1.24, 0.0, -0.46)
     hand = ball("fig.hand", 0.044, (x + 0.265, FIG_Y - 0.335, -0.395), skin, 18)
     fore2 = rod("fig.fore2", 0.042, 0.18, (x - 0.215, FIG_Y, -0.545), coat)
+    # Parented, so it cannot part company with the arm. Keyframing a hand
+    # onto a circle round the hub while its forearm stayed where it was left
+    # a skin-coloured ball orbiting the wheel on its own.
+    hand.parent = fore
+    hand.matrix_parent_inverse = fore.matrix_world.inverted()
     parts += [fore, hand, fore2]
 
     hips = ball("fig.hips", 0.135, (x, FIG_Y, -0.700), coat, 22)
@@ -118,33 +123,68 @@ def build(n_frames: int, fps: int) -> dict:
                          (0.09, 0.50, 0.62), wood))
 
     # the lamp housing, the toothed wheel, and the distant mirror
-    made.append(cube("lamp.box", (WHEEL_X - 0.40, BENCH_Y, -0.245),
+    made.append(cube("lamp.box", (WHEEL_X - 0.92, BENCH_Y, -0.245),
                      (0.24, 0.20, 0.20), dark))
     lamp_glow = glow("lab.flame", (1.0, 0.82, 0.48), 26.0)
     made.append(ball("lamp.flame", 0.040,
-                     (WHEEL_X - 0.28, BENCH_Y, -0.245), lamp_glow, 18))
+                     (WHEEL_X - 0.80, BENCH_Y, -0.245), lamp_glow, 18))
 
+    # The wheel, turned toward the lens. Fizeau's wheel spins about an axis
+    # parallel to the beam, which puts its face edge-on to a camera beside
+    # the bench -- physically right and, at this size, a brass sliver nobody
+    # can read. It is canted 58 degrees so the teeth show as a ring. The
+    # beam still passes the rim where the gaps are.
     wheel = bpy.data.objects.new("wheel", None)
     bpy.context.scene.collection.objects.link(wheel)
     wheel.location = (WHEEL_X, BENCH_Y, -0.22)
+    wheel.rotation_euler = (0.0, 0.0, 0.0)
     made.append(wheel)
-    disc = bpy.ops.mesh.primitive_cylinder_add(
-        radius=0.145, depth=0.018, location=(WHEEL_X, BENCH_Y, -0.22),
-        rotation=(0, math.pi / 2, 0), vertices=48)
+
+    CANT = math.radians(58.0)
+    hub = bpy.data.objects.new("wheel.hub", None)
+    bpy.context.scene.collection.objects.link(hub)
+    hub.parent = wheel
+    hub.rotation_euler = (0.0, CANT, 0.0)
+    made.append(hub)
+
+    def _on_hub(obj):
+        obj.parent = hub
+        obj.matrix_parent_inverse = hub.matrix_world.inverted()
+        made.append(obj)
+
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=0.150, depth=0.014, location=(WHEEL_X, BENCH_Y, -0.22),
+        rotation=(0, math.pi / 2, 0), vertices=56)
     d = bpy.context.object; d.name = "wheel.disc"
-    d.data.materials.append(brass); made.append(d)
-    d.parent = wheel
-    d.matrix_parent_inverse = wheel.matrix_world.inverted()
-    for i in range(12):
-        a = i * math.pi / 6.0
+    d.data.materials.append(brass); _on_hub(d)
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=0.034, depth=0.05, location=(WHEEL_X, BENCH_Y, -0.22),
+        rotation=(0, math.pi / 2, 0), vertices=24)
+    hubcap = bpy.context.object; hubcap.name = "wheel.hubcap"
+    hubcap.data.materials.append(dark); _on_hub(hubcap)
+
+    for i in range(16):
+        a = i * math.pi / 8.0
         t = cube(f"wheel.tooth{i}",
-                 (WHEEL_X, BENCH_Y + 0.175 * math.cos(a),
-                  -0.22 + 0.175 * math.sin(a)),
-                 (0.022, 0.055, 0.055), brass)
+                 (WHEEL_X, BENCH_Y + 0.172 * math.cos(a),
+                  -0.22 + 0.172 * math.sin(a)),
+                 (0.020, 0.030, 0.052), brass)
         t.rotation_euler = (a, 0, 0)
-        t.parent = wheel
-        t.matrix_parent_inverse = wheel.matrix_world.inverted()
-        made.append(t)
+        _on_hub(t)
+
+    # A handle on the hub, and he stands behind the bench to reach it. The
+    # first version put a crank at the near end of the bench and belted it
+    # across -- which ran a drive rod straight through the lamp housing. He
+    # is already behind the bench at a different depth from the beam, so he
+    # can simply stand at the wheel and turn it, and nothing has to cross
+    # anything.
+    handle = rod("wheel.handle", 0.012, 0.070,
+                 (WHEEL_X - 0.050, BENCH_Y - 0.105, -0.22), brass)
+    handle.rotation_euler = (0, math.pi / 2, 0)
+    _on_hub(handle)
+    knob = ball("wheel.knob", 0.019,
+                (WHEEL_X - 0.092, BENCH_Y - 0.105, -0.22), dark, 16)
+    _on_hub(knob)
 
     made.append(cube("mirror.post", (MIRROR_X, BENCH_Y, -0.62),
                      (0.07, 0.07, 0.50), dark))
@@ -152,7 +192,9 @@ def build(n_frames: int, fps: int) -> dict:
                   (0.03, 0.26, 0.26), matte("lab.silver", (0.72, 0.75, 0.78, 1.0), 0.08))
     made.append(mirror)
 
-    fig = _figure(made, WHEEL_X - 1.02)
+    # Beside the wheel, not behind it: standing him at it put the
+    # brass disc across his face.
+    fig = _figure(made, WHEEL_X - 0.46)
 
     # the pulse: out to the mirror and back, over and over
     pulse_mat = glow("lab.pulse", (1.0, 0.93, 0.70), 30.0)
@@ -169,9 +211,14 @@ def build(n_frames: int, fps: int) -> dict:
         px = WHEEL_X + (MIRROR_X - WHEEL_X) * travel
         key(pulse, f, location=(px, BENCH_Y, -0.22))
         key(wheel, f, rotation=(u * trips * 2.4 * math.pi, 0, 0))
+        # the arm works the handle: the hand is parented to it and follows
+        ang = u * trips * 2.4 * math.pi
+        key(fig["arm"], f,
+            rotation=(1.24 + 0.085 * math.sin(ang), 0.0,
+                      -0.46 + 0.075 * math.cos(ang)))
         # he leans in a little as the wheel comes up to speed
         key(fig["head"], f,
-            location=(WHEEL_X - 1.02, FIG_Y - 0.02 * math.sin(u * 3.1),
+            location=(WHEEL_X - 0.46, FIG_Y - 0.02 * math.sin(u * 3.1),
                       -0.06 + 0.006 * math.sin(u * 6.2)))
 
     label("timing a beam against a spinning wheel",
