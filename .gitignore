@@ -9,7 +9,9 @@ assets/
 
 # python
 .venv/
+.ttsvenv/
 .mcpvenv/
+.manimvenv/
 __pycache__/
 *.pyc
 
@@ -19,3 +21,6 @@ __pycache__/
 # intermediate audio and per-segment scratch
 *.wav
 .work/
+
+# macOS
+.DS_Store

@@ -1,0 +1,699 @@
+title: Special Relativity
+presenter: einstein
+voice:
+  preset: einstein
+  speed: 0.94
+look: study
+fps: 24
+chapters:
+- title: A Problem Nobody Wanted
+  segments:
+  - say: |-
+      Let me begin with a disagreement. By the end of the nineteenth century physics rested on two pillars, and each one worked beautifully. The trouble was that they could not both be right. Physics had not noticed. Physics was busy.
+    delivery: open
+    stage:
+      card:
+        title: Special Relativity
+        subtitle: a problem nobody wanted
+  - say: |-
+      The first pillar was mechanics, in the form Galileo and Newton left it. The second was electromagnetism, in the form James Clerk Maxwell left it. Put them side by side and they disagree about something embarrassingly simple: how fast light goes.
+    stage:
+      board:
+        heading: Two pillars
+        items:
+        - Galilean mechanics
+        - Maxwell's electromagnetism
+        - They disagree about light
+  - say: |-
+      Resolving that needs no difficult mathematics. It needs you to give up an assumption so comfortable that nobody noticed they were sitting on it. The assumption is that time is universal. I am sorry to be the one who takes it away.
+    delivery: weight
+    stage:
+      board:
+        heading: The assumption to drop
+        items:
+        - Time is the same for everyone
+        - Simultaneity is absolute
+        - Neither survives
+- title: Galileo's Ship
+  segments:
+  - say: |-
+      Galileo asks you to go below deck on a ship moving smoothly over a calm sea. Fish swim in their bowl. Drops fall from a bottle into a jar beneath. You throw something to a friend and they catch it exactly as they would on shore. Nothing you can do inside that cabin will tell you whether the ship is moving. The argument is profound. The method was to lock himself in a room with some fish.
+    delivery: open
+    stage:
+      demo: galileo_ship
+  - say: |-
+      That is the principle of relativity, and it is three centuries older than I am. The laws of mechanics are the same in every frame of reference moving at constant velocity, and no experiment picks out one of them as truly at rest. Nature declines to tell you where the ground is.
+    stage:
+      note:
+        heading: The principle of relativity
+        lines:
+        - $F = ma \quad$ holds in every inertial frame
+        - no experiment finds absolute rest
+  - say: |-
+      To move between two such frames Galileo gives you a recipe so simple it hardly looks like mathematics. If your frame moves at speed v along the x axis relative to mine, positions shift by v times t. And time, says Galileo, is simply carried across unchanged.
+    stage:
+      note:
+        heading: Galilean transformation
+        lines:
+        - $x' = x - vt$
+        - $y' = y, \quad z' = z$
+        - $t' = t$
+  - say: |-
+      Look carefully at that last line. t prime equals t. It looks like bookkeeping. It looks like the sort of thing you write down without reading. It is in fact the entire problem, and three hundred years of physics walked past it every morning and nodded.
+    delivery: punch
+    stage:
+      note:
+        heading: The line that fails
+        lines:
+        - $t' = t$
+        - time, assumed universal
+        - this is the assumption that breaks
+  - say: |-
+      One immediate consequence of the recipe is that velocities simply add. Walk forward at four kilometres an hour on a train doing a hundred, and the ground says a hundred and four. Nothing could be more natural, more obvious, or as it turns out, more wrong.
+    delivery: wry
+    stage:
+      note:
+        heading: Velocities add
+        lines:
+        - $u' = u - v$
+        - $100 + 4 = 104 \ \mathrm{km/h}$
+- title: What Maxwell Found
+  segments:
+  - say: |-
+      Now the second pillar. Maxwell gathered the laws of electricity and magnetism into four equations, and then did something nobody had asked him to do. He combined them. Out fell a wave.
+    delivery: open
+    stage:
+      note:
+        heading: Maxwell's equations
+        lines:
+        - $\nabla \cdot \mathbf{E} = \rho/\epsilon_0$
+        - $\nabla \cdot \mathbf{B} = 0$
+        - $\nabla \times \mathbf{E} = -\partial \mathbf{B}/\partial t$
+        - |-
+          $\nabla \times \mathbf{B} = \mu_0 \mathbf{J} + \mu_0\epsilon_0 \, \partial \mathbf{E}/\partial t$
+  - say: |-
+      The wave travelled at a speed built entirely out of two constants you can measure on a laboratory bench with no light in the room at all. One from electrostatics, one from magnetism. Put them together and you get three hundred thousand kilometres per second. Maxwell had measured the speed of light using a battery and a coil of wire.
+    stage:
+      note:
+        heading: A speed from the bench
+        lines:
+        - $c = \dfrac{1}{\sqrt{\mu_0 \epsilon_0}}$
+        - $c \approx 3.00 \times 10^8 \ \mathrm{m/s}$
+  - say: |-
+      That is the measured speed of light, arrived at by a man who was not looking for it. A triumph. But notice what his equations never mention: what that speed is measured relative to. They hand you a number and no address to go with it.
+    stage:
+      board:
+        heading: The awkward question
+        items:
+        - c falls out of the equations
+        - Relative to what?
+        - The equations do not say
+  - say: |-
+      Every other wave physics knew travelled through something. Sound travels through air, at a fixed speed relative to the air. So it seemed obvious that light travels through a medium too, and since nobody could find the medium, it was given a beautiful name instead. The luminiferous ether. It was transparent, weightless, filled the whole universe, and let the Earth pass through it without the slightest resistance. It had every property except existence.
+    delivery: wry
+    stage:
+      board:
+        heading: The ether
+        items:
+        - Sound moves through air
+        - Waves on water move through water
+        - So light moves through ... ether?
+  - say: |-
+      If the ether is there, the Earth must plough through it, and light should run faster one way than another. Michelson and Morley built an instrument delicate enough to catch a difference of one part in a hundred million. They found nothing. Not a small effect. Nothing at all. They spent years convinced they had broken their own apparatus.
+    delivery: punch
+    stage:
+      demo: michelson
+- title: Two Postulates
+  segments:
+  - say: |-
+      So here is the choice. Either the principle of relativity is wrong, or Maxwell is wrong, or something we assumed about space and time is wrong. Two of those had decades of experiment behind them. The third was an assumption that had never once been tested. I took the one with no evidence behind it.
+    delivery: open
+    stage:
+      board:
+        heading: Something has to give
+        items:
+        - Keep relativity
+        - Keep Maxwell
+        - Give up universal time
+  - say: |-
+      The first postulate: the laws of physics take the same form in every inertial frame. Not merely mechanics, as Galileo had it, but all of physics. Electromagnetism included, whether it cares for the arrangement or not.
+    stage:
+      note:
+        heading: First postulate
+        lines:
+        - The laws of physics are the same
+        - in every inertial frame.
+  - say: |-
+      The second postulate: light travels through empty space at the speed c, and that speed does not depend on the motion of the source, nor on the motion of whoever is measuring it. Read that one twice. It is the sentence that does all the damage.
+    delivery: weight
+    stage:
+      note:
+        heading: Second postulate
+        lines:
+        - $c$ is the same in every inertial frame
+        - independent of the motion of source
+        - or of observer
+  - say: |-
+      Read the second postulate again, because it is genuinely strange. Chase a beam of light at nine tenths of c and you would expect it to crawl away from you at a tenth of c. It does not. It leaves at the full c, exactly as though you had not bothered. You cannot gain on light by running. You cannot even irritate it.
+    delivery: punch
+    stage:
+      demo: chase_light
+  - say: |-
+      Everything else I am going to show you is a consequence of those two statements. No new forces. No hidden mechanism. Only a refusal to give up either postulate, and a willingness to let time bend instead. Time was the cheapest thing on the table.
+    delivery: weight
+    stage:
+      board:
+        heading: Everything follows
+        items:
+        - Simultaneity is relative
+        - Moving clocks run slow
+        - Moving lengths contract
+        - E = mc squared
+- title: Simultaneity Comes Apart
+  segments:
+  - say: |-
+      Start with the idea that breaks first. Two events happen at the same time. That sounds like a plain fact about the world. It is not a fact about the world at all. It is a fact about you.
+    delivery: open
+    stage:
+      card:
+        title: Relativity of Simultaneity
+        subtitle: the first casualty
+  - say: |-
+      Picture a railway carriage moving down the track, with a lamp exactly at its centre. The lamp flashes once. The light spreads out in both directions at speed c.
+    stage:
+      demo: train_flash_inside
+  - say: |-
+      A passenger sitting in the carriage sees the light reach the front wall and the back wall at the same moment. Of course she does. The lamp is midway between them and light travels at the same speed each way. She is entirely right, and I should like that on the record before I take it away from her.
+    delivery: aside
+    stage:
+      demo: train_flash_inside
+  - say: |-
+      Now watch the same flash from the embankment. While the light is in flight, the carriage moves. The back wall advances to meet the light going backwards. The front wall runs away from the light chasing it.
+    stage:
+      demo: train_flash_outside
+  - say: |-
+      And since light travels at c for me too, not at c plus or minus the speed of the train, the light reaches the back wall first. She says the two events were simultaneous. I say the back one happened earlier. We are both right, we have both done the experiment properly, and there is no referee.
+    delivery: punch
+    stage:
+      demo: train_flash_outside
+  - say: |-
+      There is no fact of the matter about which distant events happen at the same time. Simultaneity depends on your state of motion. Accept that single sentence and the rest of relativity follows almost against your will.
+    delivery: weight
+    stage:
+      note:
+        heading: Simultaneity is frame-dependent
+        lines:
+        - $\Delta t = 0 \ $ in one frame
+        - $\Delta t' \neq 0 \ $ in another
+        - $\Delta t' = -\gamma \, v \, \Delta x / c^2$
+- title: The Light Clock
+  segments:
+  - say: |-
+      Now let me build the simplest clock I can, and see what the postulates do to it. Two mirrors facing each other a fixed distance L apart, with a pulse of light bouncing between them. Each bounce is a tick. No gears, no spring, nothing to wear out, and nothing anyone can accuse of being disturbed by the journey.
+    delivery: open
+    stage:
+      demo: light_clock_rest
+  - say: |-
+      At rest, the light goes straight up and straight down. The round trip covers two L at speed c, so one tick takes two L over c. Nothing alarming has happened yet.
+    delivery: aside
+    stage:
+      note:
+        heading: Clock at rest
+        lines:
+        - $\Delta t_0 = \dfrac{2L}{c}$
+  - say: |-
+      Now set that same clock moving sideways at speed v and watch it go past. The light still leaves the bottom mirror and arrives at the top one. But in the time that takes, the whole clock has slid along. So the path I see is not vertical. It is a diagonal.
+    stage:
+      demo: light_clock_moving
+  - say: |-
+      The diagonal is longer than the vertical. That is not physics, that is a triangle. And here the second postulate does its work: I am not permitted to let the light hurry up to cover the extra distance. It goes at c, the same c. A longer path at the same speed takes longer. The clock is given no say in the matter.
+    delivery: punch
+    stage:
+      demo: light_clock_moving
+  - say: |-
+      Let us do the arithmetic, because it takes only a line. In my frame one tick takes delta t. In that time the clock moves v delta t sideways, while the light covers c delta t along the diagonal. Half a tick, and Pythagoras does the rest. He has been waiting two thousand years for this.
+    delivery: wry
+    stage:
+      note:
+        heading: Pythagoras on the diagonal
+        lines:
+        - |-
+          $\left(\dfrac{c \, \Delta t}{2}\right)^{2} = L^{2} + \left(\dfrac{v \, \Delta t}{2}\right)^{2}$
+  - say: |-
+      Gather the delta t terms on one side and out comes the answer. The moving clock's tick is longer than the resting clock's tick, by a factor that depends on nothing whatever except the speed.
+    stage:
+      note:
+        heading: Solving for the tick
+        lines:
+        - $\Delta t^{2}\left(c^{2} - v^{2}\right) = 4L^{2}$
+        - $\Delta t = \dfrac{2L}{c}\dfrac{1}{\sqrt{1 - v^{2}/c^{2}}}$
+        - $\Delta t = \gamma \, \Delta t_0$
+  - say: |-
+      That factor has earned its own name. We call it gamma, the Lorentz factor. It is one when nothing is moving, it creeps above one as the speed increases, and it runs away to infinity as v approaches c. It is the bill for going quickly, and it is payable in time.
+    stage:
+      demo: gamma_curve
+  - say: |-
+      At a tenth of the speed of light, gamma is about one point zero zero five. At nine tenths, about two point three. At ninety-nine per cent, about seven. Which is exactly why nobody noticed for three centuries. It hides at every speed any human being has ever travelled.
+    delivery: aside
+    stage:
+      note:
+        heading: How gamma grows
+        lines:
+        - $v = 0.10c \ \Rightarrow \ \gamma \approx 1.005$
+        - $v = 0.90c \ \Rightarrow \ \gamma \approx 2.29$
+        - $v = 0.99c \ \Rightarrow \ \gamma \approx 7.09$
+  - say: |-
+      And note what this is not. The clock is not damaged by its motion. The mechanism is not disturbed. Any clock whatever gives the same answer, because it is time itself that is being measured differently, not the clock that is misbehaving. Including, if you are the one moving, your heartbeat.
+    delivery: weight
+    stage:
+      board:
+        heading: Not a mechanical effect
+        items:
+        - Every clock agrees
+        - Nothing is disturbed
+        - Time itself is frame-dependent
+- title: Lengths Shrink
+  segments:
+  - say: |-
+      If time is affected, length has no hope of escaping. Suppose you wish to measure a moving rod. You must mark where both ends are at the same moment. And we have just established that at the same moment is not something everyone agrees about. You can see already where this is going.
+    delivery: open
+    stage:
+      demo: rod_contraction
+  - say: |-
+      Work it through and the result is the mirror image of time dilation. A rod of length L nought in its own rest frame is measured shorter, by exactly the same gamma, when it moves past you.
+    stage:
+      note:
+        heading: Length contraction
+        lines:
+        - $L = \dfrac{L_0}{\gamma} = L_0\sqrt{1 - v^{2}/c^{2}}$
+  - say: |-
+      Only along the direction of motion, mind. The rod is not squeezed from all sides. Its height and width are untouched. Space contracts along the line of travel and nowhere else. A rod flying past you is shorter, not slimmer.
+    delivery: wry
+    stage:
+      note:
+        heading: Only along the motion
+        lines:
+        - $L_x = L_{x,0}/\gamma$
+        - $L_y = L_{y,0}, \quad L_z = L_{z,0}$
+- title: The Lorentz Transformation
+  segments:
+  - say: |-
+      We are ready to retire Galileo's recipe. We need a way of converting one observer's coordinates into another's that leaves the speed of light alone for both. Lorentz found the formulae before I did, by assuming the ether and then patching it up as he went. He had the right equations for what turned out to be entirely the wrong reason.
+    delivery: open
+    stage:
+      note:
+        heading: Replacing Galileo
+        lines:
+        - $x' = \gamma\left(x - vt\right)$
+        - $y' = y, \quad z' = z$
+        - $t' = \gamma\left(t - \dfrac{vx}{c^{2}}\right)$
+  - say: |-
+      Compare that with what we had before. The space equation has picked up a factor of gamma, which is irritating but survivable. Now look at the time equation, which used to read t prime equals t. It has grown a term in x.
+    stage:
+      note:
+        heading: Then and now
+        lines:
+        - 'Galileo: $\quad t'' = t$'
+        - 'Lorentz: $\quad t'' = \gamma\left(t - vx/c^{2}\right)$'
+  - say: |-
+      That term is the whole of relativity sitting in one place. Your time depends on where you are, not only on when. Two clocks that I say are synchronised, separated along the direction of motion, are not synchronised for you. Space and time have stopped being separate things, and they did it quietly, in the middle of an equation.
+    delivery: weight
+    stage:
+      note:
+        heading: Where the strangeness lives
+        lines:
+        - $-\dfrac{v x}{c^{2}}$
+        - time depends on position
+  - say: |-
+      And when v is small compared with c, that term shrinks to nothing, gamma becomes one, and the whole apparatus collapses politely back into Galileo's recipe. Which is precisely how three hundred years of physics got away with it.
+    delivery: punch
+    stage:
+      note:
+        heading: Low speeds recover Galileo
+        lines:
+        - $v \ll c \ \Rightarrow \ \gamma \to 1, \quad vx/c^{2} \to 0$
+        - $x' \to x - vt, \quad t' \to t$
+- title: Velocities Stop Adding
+  segments:
+  - say: |-
+      Now we can settle the question we started with. On the train, walking forward, Galileo said the speeds simply add. With the Lorentz transformation, they do not.
+    delivery: open
+    stage:
+      note:
+        heading: Relativistic velocity addition
+        lines:
+        - $w = \dfrac{u + v}{1 + \dfrac{uv}{c^{2}}}$
+  - say: |-
+      At walking pace the correction is far too small to notice and the old rule is perfectly good. But that denominator is patient. Take two velocities of three quarters of c each, which Galileo would cheerfully add up to one and a half times the speed of light.
+    delivery: build
+    stage:
+      note:
+        heading: Two large velocities
+        lines:
+        - $u = v = 0.75c$
+        - $\text{Galileo:} \quad 1.50c$
+        - $\text{Lorentz:} \quad w = \dfrac{1.5c}{1 + 0.5625} = 0.96c$
+  - say: |-
+      Below c, as it must be. And if you put u equal to c itself, the formula hands you back c exactly, whatever v you chose. The second postulate is not an extra rule bolted on the side. It was inside the arithmetic the whole time.
+    delivery: punch
+    stage:
+      note:
+        heading: Light stays at c
+        lines:
+        - $u = c \ \Rightarrow \ w = \dfrac{c + v}{1 + v/c} = c$
+- title: What Everyone Agrees On
+  segments:
+  - say: |-
+      So far I have done nothing but take things away from you. Lengths, durations, simultaneity: every one of them now depends on who is asking. Let me give you something back, because I am not a barbarian.
+    delivery: open
+    stage:
+      card:
+        title: The Invariant Interval
+        subtitle: something absolute after all
+  - say: |-
+      Take two events. Compute the square of the distance between them, and subtract c squared times the square of the time between them. That combination has the same value in every inertial frame, for everybody, no matter how fast they were going when you asked them.
+    stage:
+      note:
+        heading: The spacetime interval
+        lines:
+        - |-
+          $s^{2} = \Delta x^{2} + \Delta y^{2} + \Delta z^{2} - c^{2}\Delta t^{2}$
+        - the same in every inertial frame
+  - say: |-
+      Minkowski saw what this meant before I did. He had been my mathematics teacher, and he had once described me in writing as a lazy dog. He then spent his later years building the geometry that made my work look respectable. I have never entirely settled whether that was forgiveness or revenge.
+    delivery: wry
+    stage:
+      board:
+        heading: Minkowski's reading
+        items:
+        - Not space and time
+        - One four-dimensional spacetime
+        - The interval is its geometry
+  - say: |-
+      The minus sign in front of the time term is what makes this geometry unlike the one you learned at school. It is also what keeps cause and effect in business: whether one event can influence another depends entirely on the sign of s squared.
+    delivery: weight
+    stage:
+      demo: light_cone
+- title: Mass and Energy
+  segments:
+  - say: |-
+      One more consequence, and it is the one that escaped the physics journals. Ask how much energy it takes to accelerate a body, and relativity gives an answer that grows without limit as the speed approaches c.
+    delivery: open
+    stage:
+      note:
+        heading: Energy of a moving body
+        lines:
+        - $E = \gamma m c^{2} = \dfrac{m c^{2}}{\sqrt{1 - v^{2}/c^{2}}}$
+  - say: |-
+      That is why nothing with mass ever reaches the speed of light. Not because the engine is not powerful enough, but because the bill runs to infinity, and no engine settles that account. The speed of light is not a practical limit. It is a structural one.
+    delivery: punch
+    stage:
+      demo: energy_curve
+  - say: |-
+      Now set the speed to zero and see what is left standing. Gamma becomes one, and the energy does not go to zero. A body at rest, doing nothing whatever, still has energy m c squared. It has not earned it. It simply has it.
+    stage:
+      note:
+        heading: At rest
+        lines:
+        - $v = 0 \ \Rightarrow \ \gamma = 1$
+        - $E_0 = m c^{2}$
+  - say: |-
+      Mass is not a separate substance from energy. It is a form of it, and c squared is merely the exchange rate. The rate is enormous, which is why a very small amount of mass corresponds to an alarming amount of energy.
+    stage:
+      note:
+        heading: The exchange rate
+        lines:
+        - $E = mc^{2}$
+        - $c^{2} \approx 9 \times 10^{16} \ \mathrm{m^2/s^2}$
+        - $1\ \mathrm{gram} \approx 9 \times 10^{13}\ \mathrm{J}$
+  - say: |-
+      This is the arithmetic behind the energy of the sun, and behind the weapons that were built in my lifetime. I signed a letter urging that such a weapon be understood before others understood it first. I have thought about that letter a great deal since, and I have never found the joke in it.
+    delivery: weight
+    stage:
+      board:
+        heading: Where the energy goes
+        items:
+        - Stellar fusion
+        - Nuclear fission
+        - The same equation
+- title: The Twins
+  segments:
+  - say: |-
+      Here is the objection I am asked about most, and it is a good one. If motion is relative, and each of us sees the other's clock running slow, then surely the situation is symmetric and there can be no lasting difference. People write to me about this. They write at considerable length.
+    delivery: open
+    stage:
+      card:
+        title: The Twin Paradox
+        subtitle: is the situation really symmetric?
+  - say: |-
+      Two twins. One remains on Earth. The other travels to a star four light years away at eight tenths of the speed of light, turns around, and comes home. Gamma at that speed is one and two thirds.
+    stage:
+      note:
+        heading: The journey
+        lines:
+        - $d = 4 \ \mathrm{light\ years}, \quad v = 0.8c$
+        - $\gamma = 1/\sqrt{1 - 0.64} = 1.667$
+  - say: |-
+      The Earth twin reckons the trip takes ten years. The travelling twin's clock, running slow by gamma, records six. They meet again and compare. The traveller really is the younger, and not as a matter of opinion. As a matter of birthdays.
+    delivery: punch
+    stage:
+      note:
+        heading: Who ages how much
+        lines:
+        - $t_{\mathrm{Earth}} = 2 \times 4/0.8 = 10 \ \mathrm{yr}$
+        - $t_{\mathrm{travel}} = 10/\gamma = 6 \ \mathrm{yr}$
+  - say: |-
+      So where does the symmetry break? At the turning point. The Earth twin stays in one inertial frame throughout. The traveller does not: to come home she must turn around, and turning around is not free.
+    delivery: build
+    stage:
+      demo: twin_paths
+  - say: |-
+      And when she changes frames, her notion of which distant events are happening now swings forward abruptly. That is the relativity of simultaneity arriving to settle the account. The paradox was never a paradox. It is a reminder that two paths through spacetime are genuinely different paths.
+    delivery: weight
+    stage:
+      board:
+        heading: The asymmetry
+        items:
+        - One twin stays inertial
+        - The other turns around
+        - Turning changes her 'now'
+        - Different paths, different ageing
+- title: Colour and Motion
+  segments:
+  - say: |-
+      You already know that an approaching whistle sounds higher and a departing one lower. Light does the same, with one extra complication: the clock of the source is running slow as well, so time dilation joins in on top of the motion.
+    delivery: open
+    stage:
+      note:
+        heading: Relativistic Doppler
+        lines:
+        - |-
+          $\dfrac{f_{\mathrm{obs}}}{f_{\mathrm{src}}} = \sqrt{\dfrac{1 - v/c}{1 + v/c}}$
+  - say: |-
+      A source receding from you is shifted towards the red, and one approaching is shifted towards the blue. This is how we know that the distant galaxies are moving away from us, and how quickly. The universe, it turns out, is reddening.
+    stage:
+      demo: doppler
+  - say: |-
+      There is also a transverse effect with no classical counterpart whatever. A source passing directly across your line of sight, neither approaching nor receding, is still shifted, purely because its clock runs slow. Sound does not do that. That one is relativity and nothing else, with no possible excuse.
+    delivery: punch
+    stage:
+      note:
+        heading: Transverse Doppler
+        lines:
+        - $f_{\mathrm{obs}} = f_{\mathrm{src}}/\gamma$
+        - no classical analogue
+- title: Momentum, and a Ladder
+  segments:
+  - say: |-
+      Momentum needs repairing too. The Newtonian product of mass and velocity is simply not conserved once you transform between frames properly, which is the sort of thing one would prefer to discover early.
+    delivery: open
+    stage:
+      note:
+        heading: Relativistic momentum
+        lines:
+        - $\mathbf{p} = \gamma m \mathbf{v}$
+        - $E^{2} = (pc)^{2} + (mc^{2})^{2}$
+  - say: |-
+      That second line is worth pausing on. It relates energy, momentum and mass in a single statement, and it permits something Newton would have refused to discuss: a particle with no mass at all, carrying energy and momentum, and obliged to travel always at c. We call it the photon.
+    stage:
+      note:
+        heading: A massless particle
+        lines:
+        - $m = 0 \ \Rightarrow \ E = pc$
+        - travels at $c$, always
+  - say: |-
+      Let me close the paradoxes with one more. A ladder twenty feet long is carried at high speed into a barn ten feet deep. Contracted, the ladder fits, and both doors can be shut for an instant. But in the ladder's own frame the barn is the contracted one, and there is no possible way it fits.
+    delivery: build
+    stage:
+      demo: ladder_barn
+  - say: |-
+      Both are right, and the resolution is the one you now expect. The two doors shutting are not simultaneous for the ladder. In its frame the far door opens before the near one closes, and it strolls through without ever being shut in. Nobody is trapped, and nobody is lying.
+    delivery: punch
+    stage:
+      board:
+        heading: Resolved the same way
+        items:
+        - 'Barn frame: both doors shut at once'
+        - 'Ladder frame: they shut at different times'
+        - No contradiction, only simultaneity
+  - say: |-
+      One last caution. Relativity is often said to mean that everything is relative. It means very nearly the opposite. It tells you precisely what is absolute: the speed of light, the interval between events, and the laws themselves. What is relative is only the coordinates, and the coordinates were always our invention.
+    delivery: weight
+    stage:
+      board:
+        heading: What is absolute
+        items:
+        - The speed of light
+        - The spacetime interval
+        - The form of the laws
+        - Only coordinates are relative
+- title: Proper Time
+  segments:
+  - say: |-
+      Let me sharpen what a clock actually measures. Draw a worldline: the path a body traces through spacetime. Along that path, the quantity a clock carried with the body reads is called the proper time, and it belongs to the path, not to whatever coordinate system you happened to bring with you.
+    delivery: open
+    stage:
+      note:
+        heading: Proper time
+        lines:
+        - $c^{2}d\tau^{2} = c^{2}dt^{2} - dx^{2} - dy^{2} - dz^{2}$
+        - $d\tau = dt/\gamma$
+  - say: |-
+      Two observers disagree about how much coordinate time elapsed between two events. They do not disagree about the proper time along a given worldline. That is a property of the journey itself, and the journey does not care who is watching it.
+    stage:
+      demo: twin_paths
+  - say: |-
+      This is the clean way to say what happened to the twins. They took two different paths between the same pair of events, and the proper times along those paths differ. It is no stranger than two roads between the same pair of towns having different lengths. Nobody calls that a paradox.
+    delivery: aside
+    stage:
+      board:
+        heading: The twins, restated
+        items:
+        - Same start, same finish
+        - Different worldlines
+        - Different proper time
+        - Like two roads of different length
+  - say: |-
+      Though there is one reversal worth noting. In ordinary geometry the straight line is the shortest path. In spacetime, because of that minus sign, the straight worldline is the one with the most proper time. Doing absolutely nothing, in the strictest sense available, ages you the most.
+    delivery: punch
+    stage:
+      note:
+        heading: A reversed extremum
+        lines:
+        - 'Euclidean: the straight line is shortest'
+        - 'Spacetime: the straight worldline is longest'
+        - in proper time
+- title: Working It Through
+  segments:
+  - say: |-
+      Let me put numbers to all of it, because a formula is very easy to nod along with. Take a vehicle travelling at six tenths of the speed of light. First, gamma.
+    delivery: open
+    stage:
+      note:
+        heading: A worked example
+        lines:
+        - $v = 0.6c$
+        - $\gamma = \dfrac{1}{\sqrt{1 - 0.36}} = \dfrac{1}{0.8} = 1.25$
+  - say: |-
+      A gamma of one and a quarter. Now a journey of six light years, as measured by someone at rest. At six tenths of c that takes ten years of their time, and they will feel every one of them.
+    stage:
+      note:
+        heading: The journey, from outside
+        lines:
+        - $d = 6 \ \mathrm{ly}, \quad v = 0.6c$
+        - $t = d/v = 10 \ \mathrm{years}$
+  - say: |-
+      But the traveller's clock records that divided by gamma: eight years. And from the traveller's own point of view the distance was never six light years at all. It was contracted to four point eight, covered at six tenths of c, which is eight years. The two accounts agree, as they are obliged to.
+    stage:
+      note:
+        heading: The same journey, inside
+        lines:
+        - $\tau = t/\gamma = 10/1.25 = 8 \ \mathrm{years}$
+        - $L = 6/1.25 = 4.8 \ \mathrm{ly}$
+        - $4.8 / 0.6 = 8 \ \mathrm{years} \quad \checkmark$
+  - say: |-
+      Now the energy. To bring a one kilogram mass to that speed costs gamma minus one, times m c squared. A quarter of m c squared, which for one kilogram is about two times ten to the sixteen joules.
+    stage:
+      note:
+        heading: The cost in energy
+        lines:
+        - $K = (\gamma - 1)mc^{2} = 0.25\,mc^{2}$
+        - $\approx 2.2 \times 10^{16}\ \mathrm{J}$
+        - for one kilogram
+  - say: |-
+      That is roughly the energy released by a five megaton device, spent on moving one kilogram at six tenths of c. Push the speed to ninety-nine per cent and the bill rises by a factor of twenty-four. This is what that infinity in the formula looks like when it sends an invoice.
+    delivery: punch
+    stage:
+      demo: energy_curve
+- title: How We Know
+  segments:
+  - say: |-
+      You are entitled to ask whether any of this is true, or merely elegant. The answer arrives from the sky continually, whether anybody is asking or not. Cosmic rays strike the upper atmosphere and produce muons, some fifteen kilometres up.
+    delivery: open
+    stage:
+      demo: muon
+  - say: |-
+      A muon lives, on average, about two microseconds. Even travelling at nearly the speed of light, that allows it only about six hundred metres. It should expire some fourteen kilometres short of the ground. Detectors at sea level find them in abundance.
+    delivery: build
+    stage:
+      note:
+        heading: The muon puzzle
+        lines:
+        - $\tau \approx 2.2 \ \mu\mathrm{s}$
+        - $c\tau \approx 660 \ \mathrm{m}$
+        - but they arrive from $15\ \mathrm{km}$
+  - say: |-
+      Both observers explain it, and they do not explain it the same way. From the ground, the muon's clock runs slow, so it lives long enough to arrive. From the muon's point of view, it lives exactly two microseconds, but the atmosphere is contracted to a few hundred metres. Same muon, same floor, two quite different stories.
+    stage:
+      note:
+        heading: Two descriptions, one result
+        lines:
+        - 'ground: $\ \tau'' = \gamma\tau \approx 44\ \mu\mathrm{s}$'
+        - 'muon: $\ L = L_0/\gamma \approx 750\ \mathrm{m}$'
+        - 'both agree: it arrives'
+  - say: |-
+      Particle accelerators confirm the energy relation every working day. And the satellites you use to find your way must correct for both the speed of their clocks and the gravity they sit in, or the position they report drifts by kilometres within a day. Relativity is in your pocket, quietly stopping you from driving into a field.
+    delivery: wry
+    stage:
+      board:
+        heading: Confirmed continually
+        items:
+        - Muons reaching sea level
+        - Accelerator energies
+        - Satellite navigation clocks
+  - say: |-
+      So there it is. Two postulates, neither of them outlandish, and from them: the end of universal time, clocks that disagree, lengths that depend on motion, a speed no body can reach, and mass revealed as frozen energy. Not because the world is strange for its own sake, but because the world is consistent, and we had assumed something about time that nobody had ever checked.
+    delivery: weight
+    stage:
+      card:
+        title: Two postulates
+        subtitle: everything else follows
+- title: What Comes Next
+  segments:
+  - say: |-
+      One limitation, before I stop. Everything I have shown you applies to inertial frames: observers moving steadily, never accelerating, and never near anything heavy. That is why it is called special relativity. Special, in the sense of the easy case.
+    delivery: open
+    stage:
+      board:
+        heading: The special case
+        items:
+        - Inertial frames only
+        - No acceleration
+        - No gravity
+  - say: |-
+      The question that troubled me afterwards was simple enough. A man in a falling lift feels no weight. A man in an accelerating rocket feels heavy. If no experiment inside the box can tell gravity from acceleration, perhaps there is nothing there to tell.
+    stage:
+      board:
+        heading: The equivalence principle
+        items:
+        - 'Falling: you feel weightless'
+        - 'Accelerating: you feel heavy'
+        - No experiment distinguishes them
+        - So treat them as one
+  - say: |-
+      Following that thought took me ten further years, and it ended with gravity not being a force at all, but the curvature of the spacetime we have been discussing. That is another lecture, and a considerably longer one. But notice where it begins. Two postulates, and a willingness to doubt something obvious.
+    delivery: weight
+    stage:
+      card:
+        title: General Relativity
+        subtitle: gravity as curvature -- another lecture
