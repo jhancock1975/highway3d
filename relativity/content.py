@@ -753,8 +753,8 @@ CHAPTERS = [
                      "worldline is the one with the most proper time. Staying "
                      "put ages you the most.",
                 visual=dict(kind="math", heading="A reversed extremum",
-                            lines=[r"Euclidean: straight line is $\emph{shortest}$",
-                                   r"Spacetime: straight worldline is $\emph{longest}$",
+                            lines=[r"Euclidean: the straight line is shortest",
+                                   r"Spacetime: the straight worldline is longest",
                                    r"in proper time"]),
             ),
         ],
