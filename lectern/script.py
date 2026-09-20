@@ -20,7 +20,7 @@ from lectern.score import MOODS as MUSIC_MOODS
 # renderer animates from, rather than a copy of it.
 __all__ = ["BEAT_NAMES", "DELIVERY_NAMES"]
 
-STAGE_KINDS = ("card", "board", "note", "demo")
+STAGE_KINDS = ("card", "board", "note", "demo", "scene")
 
 def _known_demos() -> tuple:
     """The demonstrations that actually exist, read off disk.
@@ -42,6 +42,20 @@ def _known_demos() -> tuple:
 
 
 KNOWN_DEMOS = _known_demos()
+
+
+def _known_scenes() -> tuple:
+    """The cutaway scenes on disk. Listed, never hardcoded -- see above."""
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "stage", "scenes")
+    try:
+        return tuple(sorted(f[:-3] for f in os.listdir(here)
+                            if f.endswith(".py") and not f.startswith("_")))
+    except OSError:
+        return ()
+
+
+KNOWN_SCENES = _known_scenes()
 
 DEFAULTS = dict(presenter="einstein", look="study", fps=24,
                 voice=dict(preset="einstein", speed=0.94))
@@ -103,9 +117,10 @@ def segments(doc: dict) -> list[dict]:
     return flat
 
 
-def validate(doc: dict, demos=None) -> list[str]:
+def validate(doc: dict, demos=None, scenes=None) -> list[str]:
     """Every problem in the document, as sentences. Empty means renderable."""
     demos = tuple(demos or KNOWN_DEMOS)
+    scenes = tuple(scenes or KNOWN_SCENES)
     problems = []
 
     if not doc.get("title"):
@@ -159,6 +174,11 @@ def validate(doc: dict, demos=None) -> list[str]:
                 problems.append(
                     f"{where} asks for the demonstration '{body}', which does "
                     f"not exist. Call lecture_describe for the catalogue.")
+        elif kind == "scene":
+            if body not in scenes:
+                problems.append(
+                    f"{where} asks for the scene '{body}', which does not "
+                    f"exist. Known scenes: {', '.join(scenes) or '(none)'}.")
         elif kind == "note":
             if not (body or {}).get("lines"):
                 problems.append(f"{where} is a note with no lines.")

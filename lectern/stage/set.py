@@ -138,6 +138,28 @@ def chalk(board, frames_dir: str, count: int) -> None:
         nt.links.new(strength.outputs[0], bsdf.inputs["Emission Strength"])
 
 
+def camera_at(location, lens, target):
+    """A camera placed exactly where a caller asks.
+
+    Cutaway scenes bring their own framing: they are not the lecture room
+    and the named framings in `camera` mean nothing in them.
+    """
+    cam_data = bpy.data.cameras.new("camera")
+    cam_data.lens = lens
+    cam = bpy.data.objects.new("camera", cam_data)
+    cam.location = location
+    bpy.context.scene.collection.objects.link(cam)
+    empty = bpy.data.objects.new("look_at", None)
+    empty.location = target
+    bpy.context.scene.collection.objects.link(empty)
+    t = cam.constraints.new("TRACK_TO")
+    t.target = empty
+    t.track_axis = "TRACK_NEGATIVE_Z"
+    t.up_axis = "UP_Y"
+    bpy.context.scene.camera = cam
+    return cam
+
+
 def camera(shot: str = "mid", target=(0, 0, 0),
            fit: float = 0.0) -> bpy.types.Object:
     """One of a few framings. The planner picks; the caller never does.

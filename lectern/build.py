@@ -40,7 +40,7 @@ MANIMVENV = os.path.join(HERE, "lectern", ".manimvenv", "bin", "python")
 BLENDER = os.environ.get("LECTERN_BLENDER", "blender")
 
 SHOT_FOR_STAGE = {"card": "note", "board": "note", "note": "note",
-                  "demo": "demo"}
+                  "demo": "demo", "scene": "scene"}
 
 
 def digest(*parts) -> str:
@@ -194,6 +194,7 @@ def render_shots(doc, narrated, work, quality, width, height,
             timeline=n["stem"] + ".json", audio=n["stem"] + ".wav",
             out=out, shot=shot_type, look=doc["look"], tail=tail,
             demo=n["seg"]["stage"]["demo"] if stage_kind == "demo" else "",
+            scene=n["seg"]["stage"]["scene"] if stage_kind == "scene" else "",
             beat=beat,
             notation=board,
             frames_dir=os.path.join(work, f"frames-{key}")))

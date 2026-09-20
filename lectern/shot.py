@@ -35,6 +35,7 @@ if HERE not in sys.path:
 from lectern.delivery import BEATS  # noqa: E402
 from lectern.presenter import character, visemes  # noqa: E402
 from lectern.stage import demos  # noqa: E402
+from lectern.stage import scenes  # noqa: E402
 from lectern.stage import set as stage  # noqa: E402
 
 
@@ -754,6 +755,16 @@ def render_one(job: dict, opt) -> dict:
               n_frames, opt.view, bounces=opt.bounces,
               denoise=not opt.no_denoise, fast_gi=opt.fast_gi)
 
+    cutaway = job.get("scene", "")
+    if cutaway:
+        # A scene replaces him. No study, no presenter, no chalkboard: it
+        # brings its own room and its own camera, and the narration that
+        # would have been delivered to camera becomes voice-over.
+        staged = scenes.build(cutaway, n_frames=n_frames, fps=opt.fps)
+        cam = staged["camera"]
+        stage.camera_at(cam["location"], cam["lens"], cam["target"])
+        return _finish(job, opt, n_frames, began, timeline)
+
     scene_parts = stage.build(job.get("look", "study"))
     parts = character.build()
 
@@ -846,6 +857,15 @@ def render_one(job: dict, opt) -> dict:
                  beat=job.get("beat", ""), board=board_plan)
     ease_interpolation()
 
+    return _finish(job, opt, n_frames, began, timeline)
+
+
+def _finish(job, opt, n_frames, began, timeline):
+    """Render the frames and mux them with the segment's audio.
+
+    Shared by the lecture-room path and the cutaway path: a scene is a
+    different picture, not a different kind of file.
+    """
     frames_dir = job.get("frames_dir") or os.path.join(
         os.path.dirname(job["out"]) or ".", "_frames")
     if os.path.isdir(frames_dir):
