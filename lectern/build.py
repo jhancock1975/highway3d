@@ -256,7 +256,7 @@ def assemble(shots, out, work, music=None) -> None:
     if r.returncode != 0:
         raise RuntimeError(f"assembly failed: {r.stderr.strip()[-400:]}")
     if music:
-        score_under(joined, out, work, music)
+        score_under(joined, shots, out, work, music)
 
 
 def duration_of(path: str, stream: str = "") -> float:
@@ -275,7 +275,40 @@ def duration_of(path: str, stream: str = "") -> float:
     return float(r.stdout.strip().rstrip(","))
 
 
-def score_under(joined: str, out: str, work: str, music: dict) -> None:
+def speech_by_the_picture(shots, work, rate: int = 48000) -> str:
+    """The voice track, laid out shot by shot against the picture.
+
+    Each shot's audio is decoded on its own, which lets ffmpeg drop the AAC
+    encoder's priming the way a player does, then padded or cut to exactly
+    that shot's picture. Every shot starts on the sample its first frame
+    starts on, so nothing can accumulate across the film.
+    """
+    import wave
+    path = os.path.join(work, "_speech.wav")
+    with wave.open(path, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        elapsed = 0.0
+        written = 0
+        for shot in shots:
+            elapsed += duration_of(shot, "v:0")
+            want = round(elapsed * rate) - written
+            r = subprocess.run(
+                ["ffmpeg", "-v", "error", "-i", shot, "-vn", "-ac", "1",
+                 "-ar", str(rate), "-f", "s16le", "-"],
+                capture_output=True)
+            if r.returncode != 0:
+                raise RuntimeError(
+                    f"decoding {shot} failed: {r.stderr.decode()[-400:]}")
+            pcm = r.stdout[:want * 2]
+            w.writeframes(pcm + b"\0" * (want * 2 - len(pcm)))
+            written += want
+    return path
+
+
+def score_under(joined: str, shots, out: str, work: str,
+                music: dict) -> None:
     """Lay a written score under the finished lecture, ducked by the speech.
 
     The score is one continuous piece across the whole film rather than one
@@ -302,23 +335,20 @@ def score_under(joined: str, out: str, work: str, music: dict) -> None:
         if r.returncode != 0:
             raise RuntimeError(
                 "score failed: " + (r.stderr or r.stdout).strip()[-400:])
-    chain = (f"[1:a]volume={level}[m];"
-             f"[m][0:a]sidechaincompress=threshold=0.03:ratio=9:"
+    speech = speech_by_the_picture(shots, work)
+    chain = (f"[2:a]volume={level}[m];"
+             f"[m][1:a]sidechaincompress=threshold=0.03:ratio=9:"
              f"attack=12:release=320[duck];"
-             f"[duck][0:a]amix=inputs=2:normalize=0[mix]")
-    # Cut to the picture. Each shot's AAC carries the encoder's priming and
-    # padding, and concatenating 82 of them hides 64.5 ms apiece inside the
-    # stream -- 5.29 seconds of it. Copying the audio through, as assembly
-    # did before there was any music, left that as stream metadata for a
-    # player to trim. Decoding it to mix a score under turns every one of
-    # those samples into real audio, and the film ended with five seconds of
-    # music playing over a picture that had already stopped.
-    picture = duration_of(joined, "v:0")
+             f"[duck][1:a]amix=inputs=2:duration=first:normalize=0[mix]")
+    # The voice comes from the shots, not from the joined file. Concatenating
+    # 82 AAC streams leaves each one's encoder priming inside the stream --
+    # 64.5 ms a shot. Copied through, that is metadata a player trims;
+    # decoded for a mix, the filter lays every sample end to end, and the
+    # voice slid 5.3 s behind the lips by the last shot.
     r = subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-i", joined, "-i", wav,
-         "-filter_complex", chain, "-map", "0:v", "-map", "[mix]",
+        ["ffmpeg", "-v", "error", "-y", "-i", joined, "-i", speech,
+         "-i", wav, "-filter_complex", chain, "-map", "0:v", "-map", "[mix]",
          "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-         "-t", f"{picture:.4f}",
          "-movflags", "+faststart", out],
         capture_output=True, text=True)
     if r.returncode != 0:
