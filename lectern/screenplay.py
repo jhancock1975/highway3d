@@ -1,7 +1,7 @@
 """Render a lecture document as a script somebody can actually read.
 
     lectern/.mcpvenv/bin/python -m lectern.screenplay \
-        --script lectures/relativity.yaml --out lectures/relativity.md
+        --script scripts/relativity.yaml --out scripts/relativity.md
 
 Generated from the document, never written beside it. The YAML is what
 renders; a second copy kept by hand would disagree with it within a day,

@@ -1,0 +1,90 @@
+# Pockterm -- a spot of about 70 seconds (162 words). First draft, for review.
+#
+# The hook is the one in pockterm/PROMOTION.local.md: most free iPhone
+# terminals mangle tmux and htop, and this one doesn't. Everything claimed
+# here is in the README -- free, no account, no tracking, SSH and SFTP, keys
+# in the Keychain, port forwarding, the AI assistant off by default.
+#
+# Where a line would land harder over real app footage (a tmux session, the
+# SFTP browser), it is marked FOOTAGE. The renderer can't cut to a screen
+# recording yet, so for now those shots are boards.
+title: Pockterm
+presenter: einstein
+voice:
+  preset: einstein
+  speed: 0.98
+look: study
+fps: 24
+music:
+  mood: drive
+  level: 0.13
+chapters:
+- title: The problem
+  segments:
+  - say: |-
+      Three in the morning. The server is down. You are not at your desk. You are in a queue for a sandwich, and all you have is your phone.
+    delivery: open
+    beat: open
+    stage:
+      card:
+        title: Three in the morning
+        subtitle: and all you have is your phone
+  - say: |-
+      So you open a free terminal app, you start tmux, and the screen turns to soup. Boxes where the borders should be. Letters where the letters should not be.
+    delivery: wry
+    beat: point
+    stage:
+      board:
+        heading: What you get
+        items:
+        - tmux, scrambled
+        - htop, scrambled
+        - you, also scrambled
+- title: The answer
+  segments:
+  - say: |-
+      This is Pockterm. tmux looks like tmux. htop looks like htop. vim looks like vim. Full-screen programs draw on your phone exactly as they draw on your desk.
+    delivery: punch
+    beat: present
+    stage:
+      # FOOTAGE: tmux with htop in one pane and vim in the other.
+      board:
+        heading: Pockterm
+        items:
+        - tmux looks like tmux
+        - htop looks like htop
+        - vim looks like vim
+  - say: |-
+      Log in with a password or with your own keys, kept in the iPhone's Keychain. Move files over SFTP on the same connection. Forward a port. Keep several sessions open and step between them.
+    delivery: build
+    beat: count
+    stage:
+      # FOOTAGE: the SFTP browser, then the session tab bar.
+      board:
+        heading: Everything you reach for
+        items:
+        - SSH with keys or passwords
+        - SFTP on the same connection
+        - Port forwarding
+        - Many sessions at once
+- title: The catch
+  segments:
+  - say: |-
+      And the catch? There is no catch. No account. No subscription. No tracking, no analytics, no advertisements. Your servers are the only thing it ever talks to.
+    delivery: weight
+    beat: beat
+    stage:
+      board:
+        heading: The catch
+        items:
+        - No account
+        - No subscription
+        - No tracking
+  - say: |-
+      Pockterm. Free, on the App Store, for iPhone and iPad. Go and get your sandwich.
+    delivery: punch
+    beat: present
+    stage:
+      card:
+        title: Pockterm
+        subtitle: Free on the App Store

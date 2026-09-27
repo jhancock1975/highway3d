@@ -1,7 +1,7 @@
 """Turn the old lecture from a program into a document.
 
     .ttsvenv/bin/python -m lectern.migrate relativity/content.py \
-        lectures/relativity.yaml
+        scripts/relativity.yaml
 
 A one-time import. `relativity/content.py` held the script, the visual
 choices and the code that drew them in a single 934-line module, which is
