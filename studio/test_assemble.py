@@ -86,6 +86,50 @@ def test_mix_is_brought_to_streaming_loudness():
     assert "loudnorm=I=-16:TP=-1.5:LRA=11" in g and "alimiter" not in g, g
 
 
+def test_every_shot_is_padded_to_its_planned_frames():
+    # A clip that decodes short (sound outlasting picture, variable frame
+    # rate) shifted every later shot, and a short one ahead of an xfade
+    # dropped the rest of the edit.
+    g = graph(A.command(plan(), "/r/out.mp4"))
+    assert "tpad=stop_mode=clone:stop_duration=6.000,trim=end_frame=180" in g, g
+    assert "trim=end_frame=90" in g and "trim=end_frame=150" in g, g
+
+
+def test_overlays_keep_their_shape():
+    g = graph(A.command(plan(), "/r/out.mp4"))
+    assert "scale=1600:200:force_original_aspect_ratio=decrease" in g, g
+
+
+def test_ffmpeg_errors_go_to_a_file_not_a_pipe():
+    # A damaged clip can make the decoder log thousands of lines; a stderr
+    # pipe nobody reads fills, ffmpeg blocks, and the job reads 40% forever.
+    import io
+    seen = {}
+
+    class Fake:
+        def __init__(self, args, **kw):
+            seen.update(kw)
+            self.stdout = iter(["out_time_us=1000000\n"])
+            self.stderr = io.StringIO("")
+            self.returncode = 1
+            if hasattr(kw.get("stderr"), "write"):
+                kw["stderr"].write("Error while decoding MB 3 7\n" * 3000)
+
+        def wait(self):
+            return 1
+
+    real, A.subprocess.Popen = A.subprocess.Popen, Fake
+    try:
+        A.run(plan(captions=[]), "/nonexistent/out.mp4")
+        failure = "a failed encode reported success"
+    except RuntimeError as e:
+        failure = str(e)
+    finally:
+        A.subprocess.Popen = real
+    assert seen["stderr"] is not A.subprocess.PIPE, "stderr is a pipe that can fill and block"
+    assert "Error while decoding MB 3 7" in failure, failure
+
+
 def test_music_ducks_under_speech():
     g = graph(A.command(plan(), "/r/out.mp4"))
     assert "sidechaincompress" in g and "asplit=2" in g, g

@@ -114,9 +114,14 @@ def command(plan: dict, out: str) -> list[str]:
 
     mix: list[tuple[str, bool, bool]] = []  # (label, speech, ducked)
     if not plan["audio_only"]:
-        tail = f"fps={fps:g},setsar=1,format=yuv420p,settb=AVTB,setpts=PTS-STARTPTS"
         for i, v in enumerate(plan["video"]):
             frames = max(1, round(v["seconds"] * fps))
+            # Exactly the planned frames: a clip that decodes short (sound
+            # outlasting picture, variable frame rate) otherwise shifts every
+            # later shot, and ahead of an xfade drops the rest of the edit.
+            tail = (f"fps={fps:g},tpad=stop_mode=clone:stop_duration="
+                    f"{v['seconds']:.3f},trim=end_frame={frames},setsar=1,"
+                    f"format=yuv420p,settb=AVTB,setpts=PTS-STARTPTS")
             if v["kind"] == "image" and v["move"] != "none":
                 k = source(v["path"])
                 graph.append(f"[{k}:v]{_fit(v['fit'], 2 * W, 2 * H)},"
@@ -168,7 +173,8 @@ def command(plan: dict, out: str) -> list[str]:
             x, y = _place(place, dw, dh, W, H)
             if place.startswith("bottom"):
                 y -= up
-            graph.append(f"[{k}:v]scale={dw}:{dh},format=rgba,"
+            graph.append(f"[{k}:v]scale={dw}:{dh}:force_original_aspect_ratio"
+                         f"=decrease,format=rgba,"
                          f"setpts=PTS-STARTPTS+{at:.3f}/TB[o{j}]")
             graph.append(f"[{acc}][o{j}]overlay=x={x}:y={y}:eof_action=pass"
                          f"[w{j}]")
@@ -254,21 +260,25 @@ def run(plan: dict, out: str) -> dict:
                              height=caption_height(plan["height"])))
         images.draw(jobs)
     _say("encoding", 0)
-    p = subprocess.Popen(command(plan, out), stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE, text=True)
-    shown = -5.0
-    for line in p.stdout:
-        if line.startswith("out_time_us="):
-            try:
-                done = int(line.split("=", 1)[1]) / 1e6
-            except ValueError:
-                continue
-            percent = min(99.0, 100.0 * done / max(plan["seconds"], 0.001))
-            if percent - shown >= 5:
-                _say("encoding", percent)
-                shown = percent
-    err = p.stderr.read()
-    p.wait()
+    # stderr to a file: a damaged clip can make the decoder log thousands of
+    # lines, and a pipe nobody is reading fills and stops ffmpeg dead.
+    with tempfile.TemporaryFile(mode="w+") as log:
+        p = subprocess.Popen(command(plan, out), stdout=subprocess.PIPE,
+                             stderr=log, text=True)
+        shown = -5.0
+        for line in p.stdout:
+            if line.startswith("out_time_us="):
+                try:
+                    done = int(line.split("=", 1)[1]) / 1e6
+                except ValueError:
+                    continue
+                percent = min(99.0, 100.0 * done / max(plan["seconds"], 0.001))
+                if percent - shown >= 5:
+                    _say("encoding", percent)
+                    shown = percent
+        p.wait()
+        log.seek(0)
+        err = log.read()
     if p.returncode != 0 or not os.path.exists(out):
         raise RuntimeError("ffmpeg stopped: " + last_line(err))
     return dict(out=out, seconds=library.probe(out)["seconds"],
