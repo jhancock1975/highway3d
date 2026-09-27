@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from typing import Annotated, Literal
 
@@ -56,7 +57,17 @@ EXAMPLE = {
 
 
 def _sentence(e: BaseException) -> str:
-    msg = str(e.args[0]) if getattr(e, "args", None) else str(e)
+    """An exception as the end of a sentence.
+
+    An OSError's first argument is its errno, which read "No speech was
+    made: 2."; and a timeout's text is the whole command, script included.
+    """
+    if isinstance(e, subprocess.TimeoutExpired):
+        return f"it took longer than {e.timeout / 60:g} minutes and was stopped."
+    if isinstance(e, OSError) and e.strerror:
+        msg = e.strerror + (f": {e.filename}" if e.filename else "")
+    else:
+        msg = str(e.args[0]) if getattr(e, "args", None) else str(e)
     return msg.rstrip(". ") + "."
 
 

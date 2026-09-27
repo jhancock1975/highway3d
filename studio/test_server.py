@@ -75,6 +75,15 @@ def test_picture_without_a_key_is_a_sentence():
                    "environment the studio server runs in."), got
 
 
+def test_os_errors_and_timeouts_read_as_sentences():
+    import subprocess
+    missing = FileNotFoundError(2, "No such file or directory", "/x/.ttsvenv/bin/python")
+    assert S._sentence(missing) == "No such file or directory: /x/.ttsvenv/bin/python.", S._sentence(missing)
+    assert S._sentence(OSError(28, "No space left on device")) == "No space left on device."
+    slow = subprocess.TimeoutExpired(["tts", "--text", "a secret script"], 1800)
+    assert S._sentence(slow) == "it took longer than 30 minutes and was stopped.", S._sentence(slow)
+
+
 def test_bad_values_are_mended_not_refused():
     got = call("studio_music", mood="jazz", seconds=2)
     assert got.startswith("mood 'jazz' is not one of drive, open, night, so it is drive."), got
