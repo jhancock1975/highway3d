@@ -24,6 +24,7 @@ assets/
 .ttsvenv/
 .mcpvenv/
 .manimvenv/
+.musicvenv/
 __pycache__/
 *.pyc
 
@@ -68,3 +69,7 @@ dist/
 
 # macOS
 .DS_Store
+
+# project-local Blender user dir: MPFB + MakeHuman packs, built by
+# lectern/presenter/setup_human.sh
+lectern/.blender/
