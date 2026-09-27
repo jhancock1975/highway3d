@@ -26,13 +26,13 @@ def test_available_counts_free_inactive_and_speculative():
 
 
 def test_room_means_no_refusal():
-    assert M.refusal("speech", 6.0) == ""
+    assert M.refusal("speech", 7.0) == ""
     assert M.refusal("assembly", 9.5) == ""
 
 
 def test_no_room_is_a_sentence_with_the_numbers():
-    got = M.refusal("speech", 5.0)
-    assert got == ("The Mac has 5 GB available and speech needs about 2 GB "
+    got = M.refusal("speech", 6.0)
+    assert got == ("The Mac has 6 GB available and speech needs about 3 GB "
                    "plus 4 GB of headroom; try again when the other work "
                    "finishes."), got
     assert "drawing needs about 1 GB" in M.refusal("gimp", 1.0)

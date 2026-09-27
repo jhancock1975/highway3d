@@ -15,7 +15,10 @@ from __future__ import annotations
 import re
 import subprocess
 
-NEEDS_GB = {"speech": 2.0, "gimp": 1.0, "assembly": 2.0}
+# Measured 2026-09-26 with /usr/bin/time -l: Kokoro peaked at 2.72 GB on a
+# 60-word paragraph (the einstein voice at 1.43), GIMP at 0.54 GB drawing a
+# card, and ffmpeg at 1.1 GB encoding 1080p.
+NEEDS_GB = {"speech": 3.0, "gimp": 1.0, "assembly": 2.0}
 HEADROOM_GB = 4.0
 CALLED = {"speech": "speech", "gimp": "drawing", "assembly": "assembly"}
 

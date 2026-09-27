@@ -71,6 +71,21 @@ def test_overlays_and_captions_are_timed():
     assert g.count("overlay=x=") == 2 and "eof_action=pass" in g, g
 
 
+def test_bottom_overlays_sit_above_the_captions():
+    # A lower third and a caption both at the bottom drew one over the other.
+    g = graph(A.command(plan(), "/r/out.mp4"))
+    assert "overlay=x=0:y=887" in g, g      # the caption strip, 1080 - 150 - 43
+    assert "overlay=x=160:y=687" in g, g    # the lower third, raised by 150
+    bare = graph(A.command(plan(captions=[]), "/r/out.mp4"))
+    assert "overlay=x=160:y=837" in bare, bare
+
+
+def test_mix_is_brought_to_streaming_loudness():
+    # The first real edit measured -27 LUFS: quiet beside anything online.
+    g = graph(A.command(plan(), "/r/out.mp4"))
+    assert "loudnorm=I=-16:TP=-1.5:LRA=11" in g and "alimiter" not in g, g
+
+
 def test_music_ducks_under_speech():
     g = graph(A.command(plan(), "/r/out.mp4"))
     assert "sidechaincompress" in g and "asplit=2" in g, g

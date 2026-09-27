@@ -32,8 +32,10 @@ from studio.timeline import TRANSITION  # noqa: E402
 ZOOM = 0.12            # how far push-in, pull-out and the pans travel
 SR = 48000
 CAPTION_HEIGHT = 0.14  # of the frame's height
-# Seconds of work per second of 1080p30 edit, measured on this Mac (Task 10).
-RATE = 1.0
+# Seconds of work per second of 1080p30 edit: measured 0.37 on 2026-09-26,
+# for a 7-second edit with a push-in, two transitions, a lower third,
+# captions and a ducked mix, not counting the caption drawing.
+RATE = 0.4
 
 
 def _fit(fit: str, w: int, h: int) -> str:
@@ -70,6 +72,11 @@ def _place(place: str, w: int, h: int, W: int, H: int) -> tuple[int, int]:
             "bottom": (cx, H - h - m), "top-left": (m, m),
             "top-right": (W - w - m, m), "bottom-left": (m, H - h - m),
             "bottom-right": (W - w - m, H - h - m)}[place]
+
+
+def caption_height(H: int) -> int:
+    """The caption strip's height: even, as every drawn size is."""
+    return round(H * CAPTION_HEIGHT) // 2 * 2
 
 
 def _sound(level: float) -> str:
@@ -143,12 +150,15 @@ def command(plan: dict, out: str) -> list[str]:
                              f"[c{i}]")
             acc = f"c{i}"
 
-        ch = round(H * CAPTION_HEIGHT)
+        ch = caption_height(H)
+        # Captions own the bottom of the frame; anything else placed at the
+        # bottom sits above them, or a lower third and a caption collide.
+        lift = ch if plan["captions"] else 0
         layers = [(o["path"], o["at"], o["seconds"], o["place"], o["width"],
-                   o["height"]) for o in plan["overlays"]]
-        layers += [(c["path"], c["at"], c["seconds"], "bottom", W, ch)
+                   o["height"], lift) for o in plan["overlays"]]
+        layers += [(c["path"], c["at"], c["seconds"], "bottom", W, ch, 0)
                    for c in plan["captions"]]
-        for j, (path, at, secs, place, w, h) in enumerate(layers):
+        for j, (path, at, secs, place, w, h, up) in enumerate(layers):
             if at >= T:
                 continue
             secs = min(secs, T - at)
@@ -156,6 +166,8 @@ def command(plan: dict, out: str) -> list[str]:
                        "-t", f"{secs:.3f}")
             dw, dh = _size(place, w, h, W, H)
             x, y = _place(place, dw, dh, W, H)
+            if place.startswith("bottom"):
+                y -= up
             graph.append(f"[{k}:v]scale={dw}:{dh},format=rgba,"
                          f"setpts=PTS-STARTPTS+{at:.3f}/TB[o{j}]")
             graph.append(f"[{acc}][o{j}]overlay=x={x}:y={y}:eof_action=pass"
@@ -196,7 +208,9 @@ def command(plan: dict, out: str) -> list[str]:
         graph.append("".join(f"[{x}]" for x in final)
                      + f"amix=inputs={len(final)}:normalize=0:duration=longest,"
                      + f"apad=whole_dur={T:.3f},atrim=end={T:.3f},"
-                     + "alimiter=limit=0.95[aout]")
+                     # -16 LUFS, the level Apple and most players expect;
+                     # the first real edit came out at -27 without it.
+                     + f"loudnorm=I=-16:TP=-1.5:LRA=11,aresample={SR}[aout]")
     else:
         k = source(f"anullsrc=r={SR}:cl=stereo", "-f", "lavfi",
                    "-t", f"{T:.3f}")
@@ -237,7 +251,7 @@ def run(plan: dict, out: str) -> dict:
             c["path"] = os.path.join(tmp, f"caption-{i:03d}.png")
             jobs.append(dict(kind="caption", out=c["path"], text=c["text"],
                              width=plan["width"],
-                             height=round(plan["height"] * CAPTION_HEIGHT)))
+                             height=caption_height(plan["height"])))
         images.draw(jobs)
     _say("encoding", 0)
     p = subprocess.Popen(command(plan, out), stdout=subprocess.PIPE,

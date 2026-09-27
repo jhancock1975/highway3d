@@ -103,13 +103,17 @@ def card(job):
             grime.edit_clear()
             Gimp.Selection.none(img)
     widest = int(W * 0.86)
-    title = text(img, job["title"], int(H * 0.13), font(s["fonts"][0]),
-                 s["title"], widest)
+    # Type sized for a full frame of this width, but never over half the
+    # height: a 1600x200 lower third sized from its height alone lettered
+    # "tmux, intact" 26 pixels tall.
+    size = int(min(0.13 * max(H, W * 9 / 16), 0.5 * H))
+    title = text(img, job["title"], size, font(s["fonts"][0]), s["title"],
+                 widest)
     sub = None
     if job.get("subtitle"):
-        sub = text(img, job["subtitle"], int(H * 0.055), font(s["fonts"][1]),
+        sub = text(img, job["subtitle"], int(size * 0.42), font(s["fonts"][1]),
                    s["sub"], widest)
-    gap = int(H * 0.03)
+    gap = int(size * 0.2)
     block = title.get_height() + (gap + sub.get_height() if sub else 0)
     y = (H - block) // 2
     title.set_offsets((W - title.get_width()) // 2, y)
