@@ -9,6 +9,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 from studio import speech as S  # noqa: E402
+from studio import speech_engine as E  # noqa: E402
 
 
 def test_punctuation_joins_the_word_before():
@@ -21,6 +22,24 @@ def test_punctuation_joins_the_word_before():
 def test_blank_tokens_are_dropped_and_times_rounded():
     raw = [dict(text=" ", start=0, end=0), dict(text="Hi", start=0.123456, end=0.4567)]
     assert S.words(raw) == [dict(text="Hi", start=0.123, end=0.457)]
+
+
+def test_long_text_is_split_into_pieces_kokoro_can_say():
+    # lectern.narrate says a whole text in one breath, and Kokoro refuses
+    # past 510 phonemes; a line break also restarted its word times at 0.
+    text = "\n".join(["Time is not universal, and every clock that moves runs "
+                      "slow against the one you are holding."] * 8)
+    got = E.pieces(text)
+    assert len(got) > 1, got
+    assert all(len(p) <= E.PIECE and "\n" not in p for p in got), got
+    assert " ".join(got).split() == text.split()
+
+
+def test_one_long_sentence_is_broken_between_words():
+    text = ", ".join(["a clock that moves runs slow"] * 20) + "."
+    got = E.pieces(text)
+    assert all(len(p) <= E.PIECE for p in got), [len(p) for p in got]
+    assert " ".join(got).split() == text.split()
 
 
 def test_unknown_voice_is_a_sentence():

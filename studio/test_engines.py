@@ -54,11 +54,24 @@ def test_speech_einstein():
 
 
 def test_long_speech_keeps_time():
-    text = " ".join(["The terminal keeps tmux intact, draws htop as it should, and "
-                     "never scrambles the borders of a pane."] * 5)
+    # Line breaks make Kokoro say it in several pieces, each timed from zero.
+    text = "\n".join(["The terminal keeps tmux intact, draws htop as it should, and "
+                      "never scrambles the borders of a pane."] * 5)
     note = speech.speak(text, "bf_emma")
     starts = [w["start"] for w in note["words"]]
     assert starts == sorted(starts), "word times went backwards between pieces"
+    assert note["words"][-1]["end"] > 0.8 * note["seconds"], (note["words"][-1], note["seconds"])
+
+
+def test_long_einstein_keeps_time():
+    # lectern.narrate alone refused this (over 510 phonemes) and restarted
+    # its word times at every line break.
+    text = "\n".join(["Time is not universal, and every clock that moves runs "
+                      "slow against the one you are holding."] * 6)
+    note = speech.speak(text, "einstein")
+    starts = [w["start"] for w in note["words"]]
+    assert starts == sorted(starts), "einstein's word times went backwards"
+    assert len(note["words"]) >= 95, len(note["words"])
     assert note["words"][-1]["end"] > 0.8 * note["seconds"], (note["words"][-1], note["seconds"])
 
 

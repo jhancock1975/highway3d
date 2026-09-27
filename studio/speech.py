@@ -1,10 +1,11 @@
 """Speech from text, with the time every word is said.
 
 Kokoro does the speaking, under `.ttsvenv`, because torch and Kokoro live
-there and nowhere else. The six plain voices go through speech_engine.py;
-`einstein` is lectern's blended, accented voice and goes through
-lectern.narrate, which already times every word. Either way the words come
-back with a start and an end, and captions are drawn from them.
+there and nowhere else, through speech_engine.py. `einstein` is lectern's
+blended, accented voice; the engine says his text through lectern.narrate
+a few sentences at a time, because narrate says a text in one breath and
+Kokoro refuses a long one. Either way the words come back with a start and
+an end, and captions are drawn from them.
 """
 
 from __future__ import annotations
@@ -52,13 +53,8 @@ def speak(text: str, voice: str = "am_michael", speed: float = 1.0) -> dict:
         raise MemoryError(refused)
     with tempfile.TemporaryDirectory(prefix="studio-speech-") as tmp:
         stem = os.path.join(tmp, "speech")
-        if voice == "einstein":
-            # 0.94 is lectern's own pace for him; `speed` scales it.
-            cmd = [TTS, "-m", "lectern.narrate", "--text", text, "--out", stem,
-                   "--speed", f"{0.94 * speed:.3f}"]
-        else:
-            cmd = [TTS, ENGINE, "--text", text, "--voice", voice,
-                   "--speed", f"{speed:.3f}", "--out", stem]
+        cmd = [TTS, ENGINE, "--text", text, "--voice", voice,
+               "--speed", f"{speed:.3f}", "--out", stem]
         r = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True,
                            timeout=1800)
         if r.returncode != 0 or not os.path.exists(stem + ".wav"):
