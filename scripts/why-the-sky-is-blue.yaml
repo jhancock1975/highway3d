@@ -1,0 +1,58 @@
+presenter: einstein
+look: study
+fps: 24
+voice:
+  preset: einstein
+  speed: 0.94
+title: Why the Sky Is Blue
+chapters:
+- title: The Blue Question
+  segments:
+  - say: Here is a question that sounds childish and is not. Why is the sky blue,
+      and not white, or violet? The answer takes us from sunlight to the size of
+      a molecule, and it is prettier than you expect.
+    stage:
+      card:
+        title: Why the Sky Is Blue
+        subtitle: A journey through light and molecules
+  - say: Sunlight is actually white, but it's made of many colors. When light hits
+      molecules in the air, it scatters more if the wavelength is shorter. Blue
+      light has a shorter wavelength, so it scatters more than red.
+    stage:
+      board:
+        heading: Scattering and Wavelength
+        items:
+        - Blue light has shorter wavelength
+        - Scatters more in air
+        - Red light has longer wavelength
+        - Scatters less
+- title: The Science of Scattering
+  segments:
+  - say: This scattering effect is called Rayleigh scattering, and it's why the
+      sky looks blue most of the time. The shorter the wavelength, the more it scatters,
+      which is why blue light dominates our view.
+    stage:
+      note:
+        heading: Rayleigh Scattering
+        lines:
+        - $I_{\text{scattered}} \propto \frac{1}{\lambda^4}$
+  - say: But wait—why isn't the sky violet? Well, our eyes are more sensitive to
+      blue light, and the sun emits more blue than violet. So we see blue, not violet,
+      even though violet scatters more.
+    stage:
+      board:
+        heading: Why Not Violet?
+        items:
+        - Violet scatters more than blue
+        - Our eyes are more sensitive to blue
+        - Sun emits more blue light
+        - We see blue, not violet
+- title: The Final Answer
+  segments:
+  - say: So the sky is blue because blue light scatters more in the atmosphere,
+      and our eyes are tuned to see it. It's a simple explanation for a beautiful
+      phenomenon that connects light, molecules, and human vision.
+    stage:
+      card:
+        title: The Final Answer
+        subtitle: Blue light, scattering, and our eyes

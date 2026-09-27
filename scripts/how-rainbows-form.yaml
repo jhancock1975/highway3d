@@ -1,0 +1,69 @@
+presenter: einstein
+look: study
+fps: 24
+voice:
+  preset: einstein
+  speed: 0.94
+title: How Rainbows Form
+chapters:
+- title: The Start of the Story
+  segments:
+  - say: Here is a question that sounds childish and is not. Why is the sky blue,
+      and not white, or violet? The answer takes us from sunlight to the size of
+      a molecule, and it is prettier than you expect.
+    stage:
+      card:
+        title: Rainbows
+        subtitle: A Short Story of Light and Water
+  - say: Sunlight is actually a rainbow in disguise. When it hits water droplets,
+      it splits into colors like a prism. Each color bends a little differently,
+      and that’s why we see a rainbow.
+    stage:
+      board:
+        heading: Light and Water
+        items:
+        - Sunlight splits into colors
+        - Each color bends differently
+        - Rainbow forms in the sky
+- title: The Physics Behind It
+  segments:
+  - say: Rainbows happen because light bends when it enters a water droplet. This
+      bending is called refraction, and it depends on the color of the light. Red
+      light bends the least, and violet the most.
+    stage:
+      board:
+        heading: Refraction and Color
+        items:
+        - Light bends when entering water
+        - Red bends the least, violet the most
+        - This causes colors to spread
+  - say: After bending, the light reflects inside the droplet and then exits. This
+      reflection and refraction make the colors spread out, and we see them as a
+      rainbow.
+    stage:
+      board:
+        heading: Reflection and Refraction
+        items:
+        - Light reflects inside the droplet
+        - It exits and spreads the colors
+        - We see a rainbow
+- title: The Final Touch
+  segments:
+  - say: To see a rainbow, the sun has to be behind you, and there has to be water
+      in the air. That’s why you see rainbows after rain, or near waterfalls.
+    stage:
+      board:
+        heading: When to See a Rainbow
+        items:
+        - Sun behind you
+        - Water in the air
+        - Rainbow appears in front
+  - say: So, a rainbow is not a physical object. It’s a pattern of light created
+      by water droplets and the way light bends. And that’s why it’s so magical.
+    stage:
+      board:
+        heading: The Magic of a Rainbow
+        items:
+        - Not a physical object
+        - Pattern of light
+        - Magic of refraction and reflection
