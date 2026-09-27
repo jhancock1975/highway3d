@@ -22,9 +22,12 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from mcp.server.mcpserver import MCPServer
-
 HERE = os.path.dirname(os.path.abspath(__file__))
+if os.path.dirname(HERE) not in sys.path:
+    sys.path.insert(0, os.path.dirname(HERE))
+
+from forgiving import ForgivingServer  # noqa: E402
+
 TOON = os.path.join(HERE, "toon.py")
 OUT_DIR = os.environ.get("HIGHWAY_OUT_DIR", os.path.join(HERE, "..", "renders"))
 OUT_DIR = os.path.abspath(OUT_DIR)
@@ -33,7 +36,7 @@ LOOKS = ("day", "golden", "dusk", "night")
 CAMERAS = ("driver", "bumper", "chase")
 STYLES = ("soft", "toon")
 
-mcp = MCPServer(
+mcp = ForgivingServer(
     name="highway3d",
     title="Highway drive renderer",
     version="1.0.0",
@@ -118,9 +121,12 @@ def highway_preview(
 ) -> str:
     """Render a cheap still contact sheet to check a look before committing.
 
-    Takes a few seconds, against minutes for highway_render. Use this to
-    confirm time of day, camera and traffic density are what the user wants.
-    Returns the absolute path of a PNG.
+    look is day (the default), golden, dusk or night; camera is driver (the
+    default), bumper or chase; style is soft (the default) or toon; traffic
+    is 0 (an empty road) to 3, 1 by default. Takes a few
+    seconds, against minutes for highway_render. Use this to confirm time of
+    day, camera and traffic density are what the user wants. Returns the
+    absolute path of a PNG.
     """
     out = _stamp(f"preview-{look}-{camera}", ".png")
     res = _run(["preview", "--out", out, "--at", at, "--look", look,
@@ -169,6 +175,11 @@ def highway_render(
     )] = 7,
 ) -> str:
     """Render a highway driving clip to an H.264 mp4.
+
+    look is day (the default), golden, dusk or night; camera is driver (eye
+    height, the default), bumper (low and fast) or chase (behind a lead car);
+    style is soft (the default) or toon; duration is seconds, 1 to 60, 8 by
+    default; traffic is 0 (an empty road) to 3, 1 by default.
 
     This takes minutes, not seconds: about 4 minutes for 8 seconds of 1080p60
     at the defaults, scaling with duration, frame size and samples. Preview

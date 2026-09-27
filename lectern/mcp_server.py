@@ -31,8 +31,10 @@ tool called something Cider already uses would simply be ignored.
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -41,15 +43,14 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from mcp.server.mcpserver import MCPServer
-
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 from lectern import script as S  # noqa: E402
+from forgiving import ForgivingServer  # noqa: E402
 
-LECTURES = os.environ.get("LECTERN_DIR", os.path.join(HERE, "lectures"))
+LECTURES = os.environ.get("LECTERN_DIR", os.path.join(HERE, "scripts"))
 RENDERS = os.environ.get("LECTERN_RENDERS", os.path.join(HERE, "renders"))
 WORK = os.environ.get("LECTERN_WORK", os.path.join(HERE, ".work"))
 
@@ -65,14 +66,15 @@ LOOKS = {
              "demonstration should be the only thing present.",
 }
 
-mcp = MCPServer(
+mcp = ForgivingServer(
     name="lectern",
     title="Narrated lecture renderer",
     version="1.0.0",
     instructions=(
         "Renders narrated lecture videos: a 3D presenter who speaks, gestures "
         "and stages physical demonstrations, with animated notation on a "
-        "chalkboard. Call lecture_describe first for the catalogue of "
+        "chalkboard. To make one from a topic in a single call, use lecture_make. "
+        "Otherwise call lecture_describe first for the catalogue of "
         "presenters, demonstrations and looks. Build a lecture with "
         "lecture_new and lecture_add, or hand over a whole document with "
         "lecture_define. Rendering is a background job: lecture_render starts "
@@ -290,6 +292,8 @@ def lecture_render(
 ) -> str:
     """Start rendering. Returns at once with a job to ask about later.
 
+    quality is draft (quick, the default) or final (the finished look, hours).
+
     This never waits for the render: a full lecture is far longer than any
     tool call is allowed to take. Ask lecture_status how it is going.
     """
@@ -302,6 +306,12 @@ def lecture_render(
         return ("Not starting: the lecture has problems that would surface "
                 "hours in.\n  " + "\n  ".join(problems[:10]))
 
+    return _start(lecture_id, doc, quality, width, height)
+
+
+def _start(lecture_id: str, doc: dict, quality: str = "draft",
+           width: int = 1920, height: int = 1080) -> str:
+    """Launch a render in the background and say how to follow it."""
     os.makedirs(RENDERS, exist_ok=True)
     job = uuid.uuid4().hex[:6]
     out = os.path.join(RENDERS, f"{lecture_id}-{quality}-{job}.mp4")
@@ -313,33 +323,133 @@ def lecture_render(
            "--quality", quality, "--width", str(width), "--height", str(height),
            "--job", job]
     with open(log, "w") as fh:
+        # Which lecture this is, for lecture_status asked with no job id, or
+        # by a server that has restarted since and forgotten _jobs.
+        fh.write("JOB " + json.dumps(dict(
+            lecture=lecture_id, title=doc["title"], quality=quality,
+            out=out)) + "\n")
+        fh.flush()
         proc = subprocess.Popen(cmd, cwd=HERE, stdout=fh, stderr=subprocess.STDOUT,
                                 start_new_session=True)
     _jobs[job] = dict(pid=proc.pid, out=out, log=log, started=time.time(),
                       lecture=lecture_id, quality=quality)
 
+    # Seconds per frame of finished lecture, everything included. Draft was
+    # 0.06 until it was measured: job 2cbe66, a 1.27-minute draft, took
+    # 0.176 hours, which is 0.35 -- and "roughly 2 minutes" for an
+    # eleven-minute render is a promise the caller passes straight on.
     minutes = S.estimate_minutes(doc)
-    hours = minutes * 60 * 24 * (1.25 if quality == "final" else 0.06) / 3600
+    hours = minutes * 60 * 24 * (1.25 if quality == "final" else 0.35) / 3600
+    wait = (f"{hours:.1f} hours" if hours >= 1
+            else f"{max(1, round(hours * 60))} minutes")
+    # Said outright, because a model reading "ask lecture_status" told its
+    # user "I'll check on it and let you know", which nothing will do.
     return (f"Started rendering '{doc['title']}' at {quality} quality as job "
-            f"{job}. About {len(S.segments(doc))} shots, roughly "
-            f"{hours:.1f} hours. Ask lecture_status about job {job}; nothing "
-            f"is lost if this session ends.")
+            f"{job}: about {len(S.segments(doc))} shots, roughly {wait}. "
+            f"Nothing announces when it finishes. lecture_status says how it "
+            f"is going whenever it is asked, with or without the job id, and "
+            f"nothing is lost if this session ends.")
+
+
+@mcp.tool()
+def lecture_make(
+    topic: Annotated[str, Field(
+        description="What the lecture is about, in plain words, e.g. 'why "
+                    "the sky is blue'.")],
+    minutes: Annotated[float, Field(
+        ge=0.5, le=15, description="Roughly how long it should run.")] = 2.0,
+    quality: Annotated[Literal["draft", "final"], Field(
+        description="draft is quick; final is the finished look and takes "
+                    "much longer.")] = "draft",
+) -> str:
+    """Make a whole lecture video from a topic, in one call.
+
+    minutes is how long it runs, 0.5 to 15; quality is draft (quick, the
+    default) or final (the finished look, hours). Writes the script, checks it, and starts the render, then
+    returns at once with a job id. For a caller that cannot build a lecture a
+    segment at a time. Ask lecture_status for progress and, when it is done,
+    the path to the video.
+    """
+    from lectern import author
+    try:
+        doc = author.write(topic, minutes)
+    except ValueError as e:
+        return f"No lecture was made: {e}"
+    base = "".join(c if c.isalnum() else "-" for c in topic.lower()).strip("-")
+    base = re.sub("-+", "-", base)[:40] or "lecture"
+    lecture_id, n = base, 2
+    while lecture_id in _list_ids():
+        lecture_id, n = f"{base}-{n}", n + 1
+    _save(lecture_id, doc)
+    return (f"Wrote '{doc['title']}' ({S.summary(doc)}) and saved it as "
+            f"'{lecture_id}'. " + _start(lecture_id, doc, quality))
 
 
 @mcp.tool()
 def lecture_status(
-    job: Annotated[str, Field(description="The job id lecture_render gave you.")],
+    job: Annotated[str, Field(
+        description="The job id lecture_render or lecture_make gave you. "
+                    "Leave it out to hear about the most recent render.")] = "",
 ) -> str:
-    """How a render is going, or how it finished."""
-    info = _jobs.get(job)
-    log = info["log"] if info else os.path.join(WORK, f"job-{job}.log")
-    if not os.path.exists(log):
-        return (f"There is no job {job} on this server. Jobs started before "
-                f"it was last restarted are not remembered.")
+    """How a render is going, or how it finished.
 
+    With no job id, the most recent render, and any others still running.
+    """
+    live = _live_jobs()
+    job = job.strip()
+    if job:
+        info = _jobs.get(job)
+        log = info["log"] if info else os.path.join(WORK, f"job-{job}.log")
+        if not os.path.exists(log):
+            return (f"There is no job {job} on this server. Ask without a "
+                    f"job id to hear about the most recent render.")
+        return _report(job, log, live)
+
+    # A caller that sees only the latest message, or starts a new
+    # conversation, has no job id to give, and "is my lecture done yet?"
+    # still deserves an answer.
+    logs = sorted(glob.glob(os.path.join(WORK, "job-*.log")),
+                  key=os.path.getmtime, reverse=True)
+    if not logs:
+        return "No lecture has been rendered on this server yet."
+    shown = logs[:1] + [p for p in logs[1:] if _job_of(p) in live]
+    return "\n".join(_named(_job_of(p), p, live) for p in shown)
+
+
+def _job_of(log: str) -> str:
+    return os.path.basename(log)[len("job-"):-len(".log")]
+
+
+def _live_jobs() -> set[str]:
+    """Jobs whose build is still running, whichever server started them."""
+    r = subprocess.run(["ps", "-axww", "-o", "args="],
+                       capture_output=True, text=True)
+    return set(re.findall(r"lectern\.build .*--job (\w+)", r.stdout))
+
+
+def _head(lines: list[str]) -> dict:
+    """The JOB line _start writes first. Logs from before it existed have none."""
+    if lines and lines[0].startswith("JOB "):
+        try:
+            return json.loads(lines[0][4:])
+        except ValueError:
+            pass
+    return {}
+
+
+def _named(job: str, log: str, live: set[str]) -> str:
+    with open(log) as fh:
+        title = _head([fh.readline().strip()]).get("title")
+    name =f"Job {job} ('{title}')" if title else f"Job {job}"
+    return f"{name}: {_report(job, log, live)}"
+
+
+def _report(job: str, log: str, live: set[str]) -> str:
+    """One job's log, read back as a sentence."""
     tail = ""
     with open(log) as fh:
         lines = [x.strip() for x in fh.readlines() if x.strip()]
+    head = _head(lines)
     for line in reversed(lines):
         if line.startswith("PROGRESS") or line.startswith("DONE") or \
            line.startswith("FAILED"):
@@ -356,6 +466,13 @@ def lecture_status(
             return f"Finished. {tail}"
     if tail.startswith("FAILED"):
         return f"That render stopped: {tail[6:].strip()}"
+    if job not in live:
+        again = (f"Rendering '{head['lecture']}' again with lecture_render "
+                 if head.get("lecture") else "Rendering it again ")
+        return (f"That render stopped before it finished, without saying why: "
+                f"its build is no longer running, most likely because the "
+                f"server or the Mac restarted under it. {again}picks up where "
+                f"it left off, since finished shots are kept.")
     if tail.startswith("PROGRESS"):
         try:
             d = json.loads(tail[8:])
