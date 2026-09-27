@@ -32,6 +32,14 @@ COVERED = make("covered.mp3", "-i", TONE, "-i", STILL, "-map", "0", "-map", "1",
                "-c:a", "libmp3lame", "-c:v", "png", "-disposition:v", "attached_pic")
 SPACED = make("my clip with spaces.mp4", "-f", "lavfi", "-i",
               "testsrc2=size=160x120:rate=30:duration=1")
+# A screen recording whose sound runs on after the picture stops.
+LONG_SOUND = make("long sound.mp4", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=30:duration=1",
+                  "-f", "lavfi", "-i", "sine=frequency=440:duration=2")
+# A phone clip stored landscape with a 90 degree display rotation.
+ROTATED = make("rotated.mp4", "-display_rotation", "90", "-i", SILENT, "-c", "copy")
+ONE_FRAME = make("one frame.mp4", "-f", "lavfi", "-i", "testsrc2=size=320x200", "-frames:v", "1")
+HEIC = os.path.join(SRC, "photo.heic")
+subprocess.run(["sips", "-s", "format", "heic", STILL, "--out", HEIC], check=True, capture_output=True)
 
 
 def test_probe_tells_kinds_apart():
@@ -43,6 +51,28 @@ def test_probe_tells_kinds_apart():
     assert (s["kind"], s["width"], s["height"], s["seconds"]) == ("image", 640, 360, None), s
     t = L.probe(TONE)
     assert t["kind"] == "audio" and abs(t["seconds"] - 1.5) < 0.05, t
+
+
+def test_a_clip_is_as_long_as_its_picture():
+    assert abs(L.probe(LONG_SOUND)["seconds"] - 1.0) < 0.1, L.probe(LONG_SOUND)
+
+
+def test_rotation_gives_the_upright_size():
+    r = L.probe(ROTATED)
+    assert (r["width"], r["height"]) == (120, 160), r
+
+
+def test_iphone_photos_import_as_pictures():
+    note = L.import_(HEIC)
+    assert note["id"].startswith("image-") and note["kind"] == "image", note
+    assert (note["width"], note["height"]) == (640, 360), note
+    assert note["path"].endswith(".png"), note
+
+
+def test_a_one_frame_video_is_a_picture():
+    note = L.import_(ONE_FRAME)
+    assert note["kind"] == "image" and note["path"].endswith(".png"), note
+    assert (note["width"], note["height"]) == (320, 200), note
 
 
 def test_cover_art_is_still_sound():

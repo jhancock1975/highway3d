@@ -13,10 +13,13 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import urllib.parse
 import urllib.request
 import uuid
+
+from studio.errors import last_line
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MEDIA = os.environ.get("STUDIO_MEDIA", os.path.join(HERE, "studio", "media"))
@@ -26,6 +29,8 @@ NOT_MEDIA = {"tty"}
 # What ffprobe calls a single picture rather than a stream of them.
 STILL_FORMATS = {"image2", "png_pipe", "jpeg_pipe", "webp_pipe", "bmp_pipe",
                  "tiff_pipe"}
+# Photos ffprobe reads as a stream with no length; sips makes them PNGs.
+PHOTOS = (".heic", ".heif", ".avif")
 # The prefix an imported file gets, by what it turns out to be.
 IMPORTED = {"video": "clip", "image": "image", "audio": "sound"}
 
@@ -49,17 +54,63 @@ def probe(path: str) -> dict:
     video = next((s for s in streams if s.get("codec_type") == "video"
                   and not s.get("disposition", {}).get("attached_pic")), None)
     sound = next((s for s in streams if s.get("codec_type") == "audio"), None)
-    if video and fmt.get("format_name") in STILL_FORMATS:
-        return dict(kind="image", seconds=None, width=video["width"],
-                    height=video["height"], sound=False)
-    seconds = round(float(fmt.get("duration") or 0.0), 3)
     if video:
-        return dict(kind="video", seconds=seconds, width=video["width"],
-                    height=video["height"], sound=sound is not None)
+        w, h = video["width"], video["height"]
+        # A phone stores portrait video landscape with a rotation to apply;
+        # ffmpeg applies it, so the size worth reporting is the upright one.
+        if abs(_rotation(path, video)) % 180 == 90:
+            w, h = h, w
+    if video and fmt.get("format_name") in STILL_FORMATS:
+        return dict(kind="image", seconds=None, width=w, height=h, sound=False)
+    if video:
+        # The picture's own length: a recording's sound can run on after it,
+        # and the container reports whichever is longer.
+        seconds = round(float(video.get("duration") or fmt.get("duration")
+                              or 0.0), 3)
+        return dict(kind="video", seconds=seconds, width=w, height=h,
+                    sound=sound is not None,
+                    frames=int(video.get("nb_frames") or 0))
+    seconds = round(float(fmt.get("duration") or 0.0), 3)
     if sound:
         return dict(kind="audio", seconds=seconds, width=None, height=None,
                     sound=True)
     raise ValueError(f"{name} has no picture or sound in it")
+
+
+def _rotation(path: str, video: dict) -> float:
+    """Degrees ffmpeg will turn this picture: the stream's, or a photo's EXIF."""
+    for side in video.get("side_data_list", []):
+        if "rotation" in side:
+            return float(side["rotation"])
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                        "-read_intervals", "%+#1", "-show_entries",
+                        "frame=side_data_list", "-of", "json", path],
+                       capture_output=True, text=True)
+    try:
+        frames = json.loads(r.stdout or "{}").get("frames", [])
+    except ValueError:
+        return 0.0
+    for frame in frames[:1]:
+        for side in frame.get("side_data_list", []):
+            if "rotation" in side:
+                return float(side["rotation"])
+    return 0.0
+
+
+def _still(path: str) -> str:
+    """A PNG of one picture ffmpeg cannot loop: an iPhone photo, a lone frame."""
+    fd, out = tempfile.mkstemp(prefix="studio-still-", suffix=".png")
+    os.close(fd)
+    if os.path.splitext(path)[1].lower() in PHOTOS:
+        cmd = ["sips", "-s", "format", "png", path, "--out", out]
+    else:
+        cmd = ["ffmpeg", "-v", "error", "-y", "-i", path, "-frames:v", "1", out]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.getsize(out):
+        os.remove(out)
+        raise ValueError(f"{os.path.basename(path)} could not be turned into "
+                         f"a picture: {last_line(r.stderr or r.stdout)}")
+    return out
 
 
 def _note_path(aid: str) -> str:
@@ -124,8 +175,17 @@ def import_(source: str, name: str = "") -> dict:
         if (note.get("source") == path and note.get("size") == st.st_size
                 and note.get("mtime") == st.st_mtime):
             return note
-    return add(path, source=path, name=name or os.path.basename(path),
-               size=st.st_size, mtime=st.st_mtime)
+    known = dict(source=path, name=name or os.path.basename(path),
+                 size=st.st_size, mtime=st.st_mtime)
+    # An iPhone photo reads as a video with no length, and so does a clip of
+    # one frame; filed as video, every edit using one is refused.
+    if os.path.splitext(path)[1].lower() in PHOTOS:
+        return add(_still(path), move=True, **known)
+    facts = probe(path)
+    if facts["kind"] == "video" and (not facts["seconds"]
+                                     or facts.get("frames") == 1):
+        return add(_still(path), move=True, **known)
+    return add(path, **known)
 
 
 def _download(url: str, name: str) -> dict:
