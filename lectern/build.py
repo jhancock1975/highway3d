@@ -1,6 +1,6 @@
 """Build a whole lecture: narrate, plan, render every shot, assemble.
 
-    python3 -m lectern.build --script lectures/relativity.yaml \
+    python3 -m lectern.build --script scripts/relativity.yaml \
         --out renders/relativity.mp4 --quality draft
 
 Runs as a detached job, because a final render is about twelve hours and no

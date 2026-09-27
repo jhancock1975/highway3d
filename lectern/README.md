@@ -6,7 +6,7 @@ blinks and stages demonstrations, with notation on a chalkboard.
 ```bash
 # check a lecture before spending hours on it
 .ttsvenv/bin/python -c "from lectern import script as s; \
-    d=s.load('lectures/relativity.yaml'); print(s.summary(d)); print(s.validate(d))"
+    d=s.load('scripts/relativity.yaml'); print(s.summary(d)); print(s.validate(d))"
 
 # one shot, end to end
 .ttsvenv/bin/python -m lectern.narrate --text "Time is not universal." --out .work/x
@@ -14,7 +14,7 @@ blender --background --factory-startup --python lectern/shot.py -- \
     --timeline .work/x.json --audio .work/x.wav --out renders/x.mp4 --engine eevee
 
 # the whole thing -- .mcpvenv, not system python: build.py reads YAML
-lectern/.mcpvenv/bin/python -m lectern.build --script lectures/relativity.yaml \
+lectern/.mcpvenv/bin/python -m lectern.build --script scripts/relativity.yaml \
     --out renders/relativity.mp4 --quality draft
 
 # for other agents
@@ -26,7 +26,7 @@ lectern/.mcpvenv/bin/python -m lectern.mcp_server --port 8767
 This replaces a 934-line `content.py` in which the script, the visual choices
 and the drawing code were the same artifact — which is exactly why nothing
 but that module could ever make a second lecture. Now the words and the
-staging are `lectures/*.yaml` and the drawing lives here, where every lecture
+staging are `scripts/*.yaml` and the drawing lives here, where every lecture
 can reach it.
 
 ```yaml
