@@ -1,0 +1,299 @@
+# The Flavor of Nothing
+#
+# St. Petersburg, 1773. Leonhard Euler is sixty-six and nearly blind -- the
+# right eye went in 1738, the cataract in the left took the rest in 1771 --
+# and he still works every night, chalk on a big slate, in letters large
+# enough to feel. Nicolas Fuss, his new assistant, has gone home.
+#
+# A visitor comes in through the window who does mathematics the way we
+# cook: numbers are flavours, primes are the spices, a series is a soup you
+# keep tasting as it simmers. Euler cannot see it. It does not need him to.
+#
+# The mathematics is real and in the order Euler found it: the Basel sum
+# (1734), the harmonic series diverging, unique factorisation, the product
+# formula (1737) and with it infinitely many primes, and e^{i pi} = -1 from
+# e^{ix} = cos x + i sin x (Introductio, 1748). Euler never wrote the "+ 1 = 0"
+# himself -- so here the alien adds it, as a pinch of seasoning.
+#
+# Beats are either a line (`euler:`, `cinnamon:`, `fuss:`) or a `do:` with no
+# words. `act` is what the speaker's body does on the line; `board` is what
+# is on the slate by the end of it; `vision` cuts to the taste.
+
+title: The Flavor of Nothing
+fps: 24
+
+cast:
+  euler:    {character: euler,    voice: euler}
+  cinnamon: {character: cinnamon, voice: cinnamon}
+  fuss:     {voice: fuss}          # heard through the door, never seen
+
+boards:
+  basel:     '1 + \tfrac{1}{4} + \tfrac{1}{9} + \tfrac{1}{16} + \cdots'
+  harmonic:  '1 + \tfrac{1}{2} + \tfrac{1}{3} + \tfrac{1}{4} + \cdots'
+  product:   '\sum_{n} \frac{1}{n^s} \;=\; \prod_{p} \frac{1}{1 - p^{-s}}'
+  exp:       'e^{i\pi}'
+  identity:  'e^{i\pi} + 1 = 0'
+
+scenes:
+
+  - scene: petersburg
+    time: night
+    beats:
+      - do: title
+        card: "St. Petersburg, 1773"
+        seconds: 4.5
+      - do: ship_descends
+        seconds: 7.0
+
+  - scene: study
+    time: night
+    beats:
+      - euler: "One. Plus a quarter. Plus a ninth. Plus a sixteenth..."
+        act: write
+        board: {write: basel}
+        mood: absorbed
+
+      - do: window_opens
+        seconds: 3.5
+
+      - euler: "Nicolas? Is that you? You are very early. Or very late."
+        act: listen
+        mood: amused
+
+      - cinnamon: "Mmm. Somebody in here is cooking numbers. I could smell it from orbit."
+        act: sniff
+        mood: curious
+
+      - euler: "Cooking? No, no. I am adding up the squares. One over the squares."
+        act: turn_to_voice
+        mood: puzzled
+
+      - cinnamon: "May I?"
+        mood: eager
+
+      - do: lick
+        target: basel
+        seconds: 2.4
+
+      - cinnamon: "One. A quarter. A ninth. Sharp at first. Then softer. And softer. And..."
+        act: savour
+        mood: dreamy
+
+      - do: vision
+        vision: basel
+        seconds: 6.0
+
+      - cinnamon: "It settles! A soup that finishes. It tastes a little like... circles."
+        mood: delighted
+
+      - euler: "Pi squared over six! You can taste that?"
+        act: lean_in
+        mood: delighted
+
+      - cinnamon: "Can't you?"
+        mood: puzzled
+
+      - euler: "I only do it in my head. My eyes gave up years ago. Fewer distractions."
+        act: tap_temple
+        mood: wry
+
+      - cinnamon: "Eyes? For mathematics? That's like listening to a cake."
+        act: shrug
+        mood: incredulous
+
+      - euler: "Ha! And who, may I ask, is the cook?"
+        act: laugh
+        mood: amused
+
+      - cinnamon: "My name is..."
+        act: puff
+        mood: proud
+
+      - euler: "Cinnamon. And... a little bit of wet dog."
+        act: sniff
+        mood: thoughtful
+
+      - cinnamon: "Close enough."
+        act: shrug
+        mood: cheerful
+
+      - euler: "Then taste this one, Cinnamon."
+        act: write
+        board: {write: harmonic}
+        mood: mischievous
+
+      - do: lick
+        target: harmonic
+        seconds: 2.0
+
+      - do: vision
+        vision: harmonic
+        seconds: 5.0
+
+      - cinnamon: "Ooh! No, no! It keeps getting stronger! Slowly, but it never, ever stops!"
+        act: fan_tongue
+        mood: alarmed
+
+      - euler: "It grows without end. We say it diverges."
+        mood: amused
+
+      - cinnamon: "We say, don't lick that."
+        mood: grumpy
+
+      - euler: "So tell me. What does a number taste like?"
+        act: lean_in
+        mood: curious
+
+      - cinnamon: "Two is salty. Three is sour. Five is sweet. And seven is a spice you don't have on this planet. Sorry."
+        act: count
+        mood: teacherly
+
+      - euler: "And six?"
+        mood: curious
+
+      - cinnamon: "Salty and sour. Like a pickle. It's just two and three in the same pot."
+        mood: cheerful
+
+      - euler: "So the primes are your spices. And every number is a recipe."
+        act: realise
+        mood: awed
+
+      - cinnamon: "One recipe each. No two the same. My grandmother knew that."
+        mood: proud
+
+      - euler: "So did Euclid. It took him longer."
+        mood: wry
+
+      - euler: "Then here is my masterpiece. On this side, every number. The whole cookbook. On that side, only the primes."
+        act: write
+        board: {write: product}
+        mood: excited
+
+      - do: lick
+        target: product
+        seconds: 2.6
+
+      - do: vision
+        vision: product
+        seconds: 6.0
+
+      - cinnamon: "They taste the same! The whole cookbook is just the spice rack!"
+        act: gasp
+        mood: amazed
+
+      - euler: "And the soup that never stops?"
+        mood: mischievous
+
+      - cinnamon: "If the cookbook never ends, then the spice rack never ends! There are infinitely many spices!"
+        act: spin
+        mood: amazed
+
+      - euler: "Seventeen thirty-seven. A very good year."
+        act: tap_board
+        mood: proud
+
+      - euler: "I saved my favourite for last."
+        act: write
+        board: {write: exp}
+        mood: tender
+
+      - cinnamon: "Ah, e. I know e. It smells like bread rising."
+        act: sniff
+        mood: dreamy
+
+      - euler: "Growth. Yes."
+        mood: tender
+
+      - cinnamon: "But this i. It smells... sideways."
+        act: tilt
+        mood: puzzled
+
+      - euler: "I turns a thing a quarter of the way around."
+        act: turn_hand
+        mood: teacherly
+
+      - do: lick
+        target: exp
+        seconds: 1.8
+
+      - do: vision
+        vision: wheel
+        seconds: 6.5
+
+      - cinnamon: "It's going round the flavour wheel. Sweet. Sour. Bitter. And at pi, halfway round, the opposite of one!"
+        act: spin
+        mood: dreamy
+
+      - euler: "Minus one."
+        mood: tender
+
+      - cinnamon: "Hmm. It needs... a pinch of one."
+        act: pinch
+        mood: chef
+
+      - do: write
+        board: {write: identity}
+        seconds: 3.4
+
+      - do: lick
+        target: identity
+        seconds: 2.2
+
+      - do: vision
+        vision: nothing
+        seconds: 6.5
+
+      - cinnamon: "Nothing. It tastes of absolutely nothing."
+        mood: moved
+        delivery: aside
+
+      - euler: "Is that bad?"
+        mood: concerned
+
+      - cinnamon: "It is the most perfect nothing I have ever tasted."
+        mood: moved
+
+      - euler: "They tell me it is beautiful to look at. I have not seen it in years."
+        mood: wistful
+        delivery: aside
+
+      - cinnamon: "Neither have I. We don't need to."
+        act: touch_hand
+        mood: tender
+
+      - do: ship_toots
+        seconds: 3.0
+
+      - cinnamon: "That's my ride. Leonhard, may I take the recipe home?"
+        mood: eager
+
+      - euler: "It was never mine to keep."
+        mood: tender
+
+      - do: slurp
+        seconds: 3.2
+
+      - cinnamon: "Goodnight, Leonhard!"
+        act: exit
+        mood: cheerful
+
+      - euler: "Goodnight, Cinnamon."
+        mood: tender
+
+  - scene: study
+    time: morning
+    beats:
+      - do: knock
+        seconds: 2.5
+
+      - fuss: "Herr Euler? Who licked the slate clean? And why does it smell of cinnamon in here?"
+
+      - euler: "And a little bit of wet dog."
+        mood: content
+
+  - scene: petersburg
+    time: dawn
+    beats:
+      - do: skywriting
+        card: "The End"
+        seconds: 8.0
