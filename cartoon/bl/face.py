@@ -57,7 +57,7 @@ def jaw_weights(P, mouth_c, half_w, smile_lift=0.0075, back_y=0.03, reach=None):
     if reach is not None:
         # a creature that is all face below the mouth: the jaw is only the
         # muzzle, not the belly under it
-        w *= _ss(-reach, -reach * 0.45, v)
+        w *= _ss(-reach, -reach * 0.25, v)
         w *= _ss(half_w * 1.9, half_w * 1.2, np.abs(P[:, 0] - mx))
     return w
 

@@ -12,6 +12,7 @@ has that he does not:
   cinnamon.tongue                         a curve: its points and
                                           bevel_factor_end are the lick
   body mesh shape keys                    bl/face.py, plus nostril_flare
+  (no eyes: the brows, the nose and the antennae carry the expression)
 """
 
 from __future__ import annotations
@@ -102,14 +103,8 @@ def build(coll=None, voxel=0.0028):
         C.assign_by_label(a, {"tip": 1})
         ants[s] = a
 
-    eye_mat = C.mat_eye("cinnamon.eye", iris=(0.1, 0.55, 0.52), iris_dark=(0.02, 0.18, 0.2),
-                        pupil=0.42, iris_size=0.62)
-    lid_mat = E.lid_material("cinnamon.lid", X.BODY, lash_rgb=(0.12, 0.03, 0.01))
+    # no eyes: it has never needed them
     eyes = {}
-    for s, sx in ((".L", 1), (".R", -1)):
-        c = Vector((sx * X.EYE_L_POS[0], X.EYE_L_POS[1], X.EYE_L_POS[2]))
-        eyes[s] = E.build_eye(NAME + s, c, X.EYE_R, eye_mat, lid_mat, coll, tilt=-sx * X.EYE_TILT,
-                              gap=0.0016, thickness=0.0026)
 
     arm = R.armature(NAME + ".rig", bones(), coll)
     keep = {b["name"] for b in bones() if not b["name"].startswith("ant_") and b["name"] != "jaw"
@@ -118,7 +113,7 @@ def build(coll=None, voxel=0.0028):
     # jaw, and fingers by segment, on top of the heat weights
     P = C.verts_np(body)
     lab = C.labels_np(body)
-    wj = F.jaw_weights(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, back_y=0.0, reach=0.07)
+    wj = F.jaw_weights(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, back_y=0.0, reach=0.1)
     wj[lab == "hand"] = 0
     _blend_group(body, "jaw", wj, take_from=["head", "body"])
     for s, sx in ((".L", 1), (".R", -1)):
@@ -149,9 +144,6 @@ def build(coll=None, voxel=0.0028):
         a.matrix_world = mw
         a.matrix_parent_inverse = arm.matrix_world.inverted()
 
-    for s, e in eyes.items():
-        R.attach(e["root"], arm, "head")
-
     for s, sx in ((".L", 1), (".R", -1)):
         hb = arm.data.bones["hand" + s]
         tgt = R.empty(f"{NAME}.ik.hand{s}", Vector(X.J["hand" + s]), coll, 0.03, "CUBE")
@@ -174,9 +166,12 @@ def build(coll=None, voxel=0.0028):
     keys = F.mouth_keys(P, X.MOUTH_C, X.MOUTH_HALF_W, lip_up, lip_lo, X.CHEEKS, X.SMILE_LIFT)
     keys.update(F.brow_keys(P, X.BROW_L, X.BROW_R, X.CHEEKS[0], X.CHEEKS[1],
                             X.BROW_INNER_L, X.BROW_INNER_R, sig=0.035))
-    # scale the mouth keys up: this mouth is twice Euler's
+    # scale the mouth keys up: this mouth is twice Euler's. And with no eyes
+    # the brows carry the face, so they travel further too
     for k in ("mouth_wide", "mouth_narrow", "smile", "frown"):
         keys[k] = keys[k] * 1.6
+    for k in [k for k in keys if k.startswith(("brow_", "cheek_"))]:
+        keys[k] = keys[k] * 1.5
     keys["nostril_flare"] = _nostril_flare(P)
     keys["nose_scrunch"] = _nose_scrunch(P)
     F.add_keys(body, keys)
@@ -189,13 +184,11 @@ def build(coll=None, voxel=0.0028):
         C.subsurf(o, 1, 2)
     for o in ants.values():
         C.subsurf(o, 0, 1)
-    for s, e in eyes.items():
-        E.set_lids(e, 0.85, 0.9)
 
     arm["character"] = NAME
     arm["head_mesh"] = body.name
-    arm["eyes"] = {s: {k: (v.name if hasattr(v, "name") else v) for k, v in e.items()} for s, e in eyes.items()}
-    arm["lids_rest"] = {".L": [0.85, 0.9], ".R": [0.85, 0.9]}
+    arm["eyes"] = {}
+    arm["lids_rest"] = {}
     arm["tongue"] = tongue.name
     arm["face_offset"] = (0, -0.1, -0.005)
     return dict(rig=arm, body=body, eyes=eyes, antennae=ants, tongue=tongue, coll=coll)
