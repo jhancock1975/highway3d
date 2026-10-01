@@ -195,6 +195,13 @@ def _single(subject, other, dist, lens, side=1, off_deg=22, height=0.0, look_dow
     return dict(loc=loc, target=tgt, lens=lens)
 
 
+def _board_left():
+    """The slate's own -u direction, in the world (away from Euler)."""
+    a = MK.board_point(0.0, 0.5)
+    b = MK.board_point(1.0, 0.5)
+    return _unit([a[0] - b[0], a[1] - b[1], 0.0])
+
+
 def _write_cam():
     """In front of him and a little to his left -- on the audience's side of
     the line -- with the slate raking away at frame left as he turns to it."""
@@ -228,7 +235,12 @@ def setups():
                             height=-0.02),
         "cinn_cu": _single([home[0], home[1], home[2] + 0.04], EULER_HEAD, 0.9, 55, side=-1, off_deg=26),
         "close_two": dict(loc=[0.75, -0.45, 1.05], target=[0.0, 0.55, 0.95], lens=45),
-        "slate": dict(loc=_add(bp, bn, 1.05), target=bp, lens=38),
+        # the insert on the slate, swung toward its far edge so Euler's
+        # shoulder, right beside the near edge, stays out of it
+        "slate": dict(loc=_add(list(MK.board_point(0.5, 0.45)),
+                               _unit([bn[0] * 0.6 + _board_left()[0] * 0.8, bn[1] * 0.6 + _board_left()[1] * 0.8, 0.1]),
+                               1.15),
+                      target=list(MK.board_point(0.62, 0.42)), lens=36),
         "lick": dict(loc=[0, 0, 0], target=[0, 0, 0], lens=30, track="lick"),
         # from beside the slate, looking back at him as he writes: his face,
         # the chalk hand in the foreground, the board raking away at left

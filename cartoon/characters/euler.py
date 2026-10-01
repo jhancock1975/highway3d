@@ -107,6 +107,42 @@ BODY_BONES = {"root", "spine", "chest", "neck", "head"} | {
     b + s for b in ("shoulder", "upper_arm", "forearm", "thigh", "shin", "foot") for s in (".L", ".R")}
 
 
+def _torso_off_the_arms(body, reach=0.12, near=0.05):
+    """Only the sleeves follow the arms.
+
+    Bone heat gave the robe's side, under the armpit, a share of the upper
+    arm; when he raised it to write, that skin swung out with the arm into a
+    fin below it. Torso vertices keep an arm weight only within `reach` of
+    the shoulder joint, fading from `near`; what they lose goes to the chest.
+    """
+    lab = C.labels_np(body)
+    P = C.verts_np(body)
+    groups = {vg.name: vg.index for vg in body.vertex_groups}
+    chest = body.vertex_groups["chest"]
+    arm_bones = [b for b in groups if b.startswith(("upper_arm", "forearm", "shoulder"))]
+    moved = 0
+    for vi, v in enumerate(body.data.vertices):
+        if lab[vi] == "sleeve":
+            continue
+        give = 0.0
+        for g in v.groups:
+            name = body.vertex_groups[g.group].name
+            if name not in arm_bones:
+                continue
+            side = ".L" if name.endswith(".L") else ".R"
+            d = np.linalg.norm(P[vi] - np.array(X.J["upper_arm" + side]))
+            keep = 1.0 if d < near else max(0.0, 1.0 - (d - near) / (reach - near))
+            if name.startswith("shoulder"):
+                keep = max(keep, 0.5)
+            give += g.weight * (1.0 - keep)
+            g.weight *= keep
+        if give > 1e-4:
+            chest.add([vi], give, "ADD")
+            moved += 1
+    R.normalise(body)
+    C.log(f"{body.name}: {moved} torso vertices handed from the arms to the chest")
+
+
 def body_materials(ob):
     mats = [
         C.mat_satin("euler.robe", rough=0.42, aniso=0.35, spec=0.45),
@@ -128,6 +164,11 @@ def build(coll=None, voxel_head=0.0022, voxel_body=0.004):
     # ---- meshes
     body = C.mesh_from_field(NAME + ".body", X.body(), *X.BODY_BOUNDS, voxel_body, coll)
     body_materials(body)
+    sleeves = {}
+    for s in (".L", ".R"):
+        sl = C.mesh_from_field(NAME + ".sleeve" + s, X.sleeve(s), *X.sleeve_bounds(s), voxel_body * 0.9, coll)
+        sl.data.materials.append(bpy.data.materials["euler.robe"])
+        sleeves[s] = sl
 
     head = C.mesh_from_field(NAME + ".head", X.head(), *X.HEAD_BOUNDS, voxel_head, coll)
     head.location = ho
@@ -175,6 +216,13 @@ def build(coll=None, voxel_head=0.0022, voxel_body=0.004):
     arm = R.armature(NAME + ".rig", bones(), coll)
     # body: bone heat, body bones only
     R.skin_auto(body, arm, keep=BODY_BONES)
+    _torso_off_the_arms(body)
+    # sleeves: the arm bones only, blended along shoulder -> elbow -> wrist
+    for s, sl in sleeves.items():
+        P_s = C.verts_np(sl)
+        pts = [np.array(X.J[k + s]) for k in ("upper_arm", "forearm", "hand")]
+        W = R.segment_weights(P_s, pts, ["upper_arm" + s, "forearm" + s], before="shoulder" + s, blend=0.3)
+        R.skin_groups(sl, arm, W)
     # head: head and jaw by the face rig's function
     P = C.verts_np(head)
     wj = F.jaw_weights(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT)
@@ -237,7 +285,7 @@ def build(coll=None, voxel_head=0.0022, voxel_body=0.004):
     F.add_keys(head, keys)
     head.data.shape_keys.key_blocks["lips_close"].value = 1.0
 
-    for o in (body, head, hair, cap, hands[".L"], hands[".R"]):
+    for o in (body, head, hair, cap, hands[".L"], hands[".R"], sleeves[".L"], sleeves[".R"]):
         C.subsurf(o, 1, 2)
     for o in (t_up, t_lo, tg):
         C.subsurf(o, 0, 1)
