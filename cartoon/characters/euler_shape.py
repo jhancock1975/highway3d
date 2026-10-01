@@ -334,25 +334,20 @@ def body():
         Ellipsoid((0.155, 0.01, 0.93), (0.075, 0.075, 0.06), color=ROBE, label="robe", mirror=True),
     ]
     for s in (".L", ".R"):
-        # sleeves: wide and soft, widening to a turned-back cuff
-        robe.append(Capsule(j["upper_arm" + s], j["forearm" + s], 0.058, 0.052, color=ROBE, label="sleeve"))
-        robe.append(Capsule(j["forearm" + s], j["hand" + s] + (j["forearm" + s] - j["hand" + s]) * 0.08,
-                            0.052, 0.062, color=ROBE, label="sleeve"))
+        # (the sleeves are separate pieces: see sleeve())
         # thighs under the skirts of the robe
         robe.append(Capsule(j["thigh" + s], j["shin" + s], 0.092, 0.075, color=ROBE, label="robe"))
     # the skirts falling over the knees and between them
     robe.append(S.blend(RoundBox_((0, -0.3, 0.44), (0.19, 0.12, 0.1), 0.06, color=ROBE, label="robe"), 0.06))
     robe.append(S.blend(Ellipsoid((0, -0.43, 0.36), (0.2, 0.05, 0.14), color=ROBE, label="robe"), 0.05))
     body = Union(robe, k=0.04)
-    body = S.PaintFn(body, _robe_colour, STRIPE, label="robe")
+    # colour only: relabelling the stripes "robe" made every stripe on a
+    # sleeve count as torso, and the rig stripped those vertices off the arm
+    body = S.PaintFn(body, _robe_colour, STRIPE)
     # dark satin edging down the opening and round the cuffs
     edge = lambda P: np.clip(1.0 - np.abs(P[:, 0] - 0.012 * np.sin(P[:, 2] * 8)) / 0.016, 0, 1) \
         * (P[:, 1] < -0.05) * (P[:, 2] > 0.5)
-    body = S.PaintFn(body, lambda P: (edge(P) > 0.5).astype(float), TRIM, label="robe")
-    for s in (".L", ".R"):
-        cuff = Capsule(j["hand" + s] + (j["forearm" + s] - j["hand" + s]) * 0.12,
-                       j["hand" + s] + (j["forearm" + s] - j["hand" + s]) * 0.0, 0.07, 0.07)
-        body = Paint(body, cuff, TRIM, soft=0.004)
+    body = S.PaintFn(body, lambda P: (edge(P) > 0.5).astype(float), TRIM)
 
     # shawl collar of the banyan round the neck, dark satin
     collar = S.Torus((0, 0.005, 0.975), 0.088, 0.024, R=rot(-18, 0, 0), color=TRIM, label="collar")
@@ -390,6 +385,35 @@ def body():
                                       color=(0.05, 0.035, 0.03), label="shoe"), 0.01))   # sole & heel
     body = Union([body] + legs, k=0.025)
     return body
+
+
+def sleeve(side):
+    """One sleeve of the banyan, a piece of its own.
+
+    Sculpted fused to the side of the robe, as the first build had it, the
+    sleeve dragged the robe's flank up with it whenever he raised his arm to
+    write, into a flat fin of skin under the armpit. Separate, it lifts away
+    from the body the way cloth does, and its top sinks into the shoulder so
+    no seam ever shows.
+    """
+    j = {k: np.array(v) for k, v in J.items()}
+    s = side
+    wrist = j["hand" + s] + (j["forearm" + s] - j["hand" + s]) * 0.08
+    sl = Union([
+        Sphere(j["upper_arm" + s] + (j["shoulder" + s] - j["upper_arm" + s]) * 0.15, 0.064, color=ROBE, label="sleeve"),
+        Capsule(j["upper_arm" + s], j["forearm" + s], 0.058, 0.052, color=ROBE, label="sleeve"),
+        Capsule(j["forearm" + s], wrist, 0.052, 0.062, color=ROBE, label="sleeve"),
+    ], k=0.03)
+    sl = S.PaintFn(sl, _robe_colour, STRIPE)
+    cuff = Capsule(j["hand" + s] + (j["forearm" + s] - j["hand" + s]) * 0.12,
+                   j["hand" + s] + (j["forearm" + s] - j["hand" + s]) * 0.0, 0.07, 0.07)
+    return Paint(sl, cuff, TRIM, soft=0.004)
+
+
+def sleeve_bounds(side):
+    j = {k: np.array(v) for k, v in J.items()}
+    pts = np.array([j["shoulder" + side], j["upper_arm" + side], j["forearm" + side], j["hand" + side]])
+    return tuple(pts.min(0) - 0.1), tuple(pts.max(0) + 0.1)
 
 
 def RoundBox_(center, half, r, **kw):

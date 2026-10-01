@@ -17,10 +17,10 @@ EULER = (0.25, 0.87, 0.0)
 EULER_YAW = -36.0
 
 # the slate on its easel
-SLATE_ROOT = (-0.38, 0.78, 0.0)
-SLATE_YAW = 62.0
+SLATE_ROOT = (-0.18, 1.065, 0.0)
+SLATE_YAW = 48.6
 SLATE_W, SLATE_H = 0.95, 0.72
-SLATE_Z = 0.58                  # bottom edge of the writing surface
+SLATE_Z = 0.52                  # bottom edge of the writing surface
 SLATE_TILT = -9.0               # leaning back, degrees
 
 # the window (on the back wall, y = 3)
@@ -62,14 +62,28 @@ def euler_point(local):
 
 
 # where each formula is written, as (u0, u1, v_centre, height) on the board
-# Everything sits in the right-hand two thirds: he writes from his chair,
-# leaning, and the left of the board is out of an old man's reach.
+# Everything he writes sits where he can reach from his chair with his arm
+# still bent -- within 0.40 m of his shoulder as it really is when he leans
+# (it moves only 4-6 cm; his spine bends low). An earlier layout spread the
+# formulas to 0.77 m, and his hand hung off the slate's edge, arm locked
+# straight, while the chalk wrote on without it.
 BOARD_LAYOUT = {
-    "basel":    (0.40, 0.97, 0.85, 0.11),
-    "harmonic": (0.40, 0.97, 0.66, 0.11),
-    "product":  (0.26, 0.97, 0.43, 0.17),
-    "exp":      (0.48, 0.68, 0.16, 0.12),
-    "identity": (0.48, 0.97, 0.16, 0.12),
+    "basel":    (0.42, 0.84, 0.72, 0.085),
+    "harmonic": (0.42, 0.84, 0.59, 0.085),
+    "product":  (0.40, 0.86, 0.43, 0.13),
+    "exp":      (0.48, 0.60, 0.265, 0.09),
+    "identity": (0.48, 0.84, 0.265, 0.09),
+}
+
+# older work, half rubbed out, on the part of the slate he cannot reach
+# from his chair: it was written standing, some other day
+GHOST_LAYOUT = {
+    "ghost_formula": (0.1, 0.37, 0.84, 0.065),
+    "ghost_poly":    (0.12, 0.33, 0.12, 0.065),
+}
+GHOSTS = {
+    "ghost_formula": r"e^{ix} = \cos x + i \sin x",
+    "ghost_poly":    r"V - E + F = 2",
 }
 
 # Cinnamon's marks (world, its body centre)
@@ -84,8 +98,10 @@ CINNAMON = {
 
 def watch_spot():
     """Where Cinnamon hovers while Euler writes: up over the slate's top
-    corner, peeking down at the chalk -- out of the writing shot's way."""
-    p = board_point(0.12, 1.12, lift=0.22)
+    edge and a little behind it, peering down at the chalk -- facing the
+    audience and well clear of the writing shot's lens. (Hovering over the
+    front corner put the back of its head in the foreground of that shot.)"""
+    p = board_point(0.55, 1.4, lift=-0.12)
     return (p[0], p[1], p[2])
 
 
@@ -97,3 +113,10 @@ def lick_spot(board: str):
 
 
 HEAD_EULER = euler_point((0.0, -0.06, 1.16))
+
+# his right shoulder while he leans to write, measured on the rig (body
+# coordinates), and how far the chalk may be from it. The wrist reaches
+# 0.485 m, but the chalk in his fist sits beside the line of the arm, not
+# beyond it -- measured, it adds 2-3 cm -- so 0.40 keeps the elbow bent.
+WRITING_SHOULDER = (-0.219, 0.01, 0.899)
+CHALK_REACH = 0.40

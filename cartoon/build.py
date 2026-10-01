@@ -171,7 +171,8 @@ def build(script_path, out, work=None, engine="BLENDER_EEVEE", samples=96, res="
             _run([TTS, "-m", "cartoon.score", "--film", os.path.join(work, "film.json"), "--out", music_wav],
                  log, cwd=ROOT)
         st.set(step="typeset")
-        pngs = chalk.typeset(doc.get("boards") or {}, os.path.join(work, "chalk"))
+        from cartoon.sets import marks as MK
+        pngs = chalk.typeset(dict(doc.get("boards") or {}, **MK.GHOSTS), os.path.join(work, "chalk"))
         frames = os.path.join(work, "frames")
         os.makedirs(frames, exist_ok=True)
         if not assemble_only:

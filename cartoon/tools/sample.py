@@ -16,7 +16,8 @@ a = ap.parse_args()
 film = json.load(open(a.film))
 work = os.path.dirname(os.path.abspath(a.film))
 doc = script.load(a.script)
-pngs = chalk.typeset(doc["boards"], os.path.join(work, "chalk"))
+from cartoon.sets import marks as MK
+pngs = chalk.typeset(dict(doc["boards"], **MK.GHOSTS), os.path.join(work, "chalk"))
 for spec in a.shots.split(","):
     sh, fr = map(int, spec.split(":"))
     shot = film["shots"][sh]
@@ -28,4 +29,7 @@ for spec in a.shots.split(","):
                         "--out", a.out, "--frames", str(fr), "--res", a.res, "--samples", a.samples,
                         "--engine", a.engine], capture_output=True, text=True)
     err = [l for l in (r.stdout + r.stderr).splitlines() if "Error" in l or "Traceback" in l or "line " in l]
+    for l in (r.stdout).splitlines():
+        if "chalk on the slate" in l:
+            print("  ", l.strip(), flush=True)
     print(sh, fr, "ok" if r.returncode == 0 and not err else "\n".join(err[-12:]), flush=True)

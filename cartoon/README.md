@@ -75,9 +75,17 @@ anything.
 
 Euler is drawn from Handmann's 1753 pastel -- the long nose, the knowing
 smile, the right eye narrowed, the floppy satin cap, the teal striped banyan
--- twenty years older. Cinnamon is a floating cinnamon-brown bean with a
-nose far too big for its face, moth antennae that glow when it smells, and a
-frog's mouth for a tongue long enough to lick a slate across a desk.
+-- twenty years older. Cinnamon is a floating cinnamon-brown bean with no
+eyes at all: a nose far too big for its face is how it finds its way, moth
+antennae that glow when it smells are how it looks round, and a frog's mouth
+holds a tongue long enough to lick a slate across a desk. With no eyes, its
+brows (bolder than Euler's, on a soft ridge where eyes would be), nose,
+antennae and mouth carry every expression -- and when it tells a blind man
+"neither have I", it means it.
+
+Euler's sleeves are separate pieces weighted only to his arms. Fused to the
+robe, as they were first sculpted, raising an arm to write dragged the robe's
+flank up with it into a fin of skin under the armpit.
 
 The face rig (`bl/face.py`) is computed from where the mouth and brows are:
 jaw weights sharp inside the mouth (the split runs through empty space) and
@@ -102,6 +110,24 @@ Euler is blind: he turns his face toward a voice and his eyes rest a little
 off it. Cinnamon floats: position from the blocking with a manner (drift,
 zip with anticipation and overshoot, a nose-first sniffing wander), bob,
 banking into turns, squash and stretch that keeps its volume.
+
+## Where the chalk goes
+
+The hand is on an IK target, but the chalk sits in the fist beside the line
+of the arm, so aiming the wrist at the writing leaves the chalk wherever the
+geometry puts it. After the rest of the performance is keyed, `chalk_pass`
+measures the chalk's tip on every writing frame and moves the target by the
+miss, three times over: the tip lands within 6 mm of the text being written.
+
+That only works if the text is within reach, and the first layout was not:
+it assumed leaning moved his shoulder 25 cm toward the slate, when on the rig
+it moves 4-6 cm (his spine bends low). Formulas sat up to 0.77 m away, his
+arm locked straight, and his hand hung off the slate's edge while the chalk
+wrote on without it. The slate is now placed, and the formulas laid out, so
+everything he writes is within 0.40 m of his shoulder as measured in the
+writing pose, and `test_cartoon.py` checks that against the measured number.
+The far side of the slate carries older work, half rubbed out, that he could
+only have written standing.
 
 ## What a frame costs
 

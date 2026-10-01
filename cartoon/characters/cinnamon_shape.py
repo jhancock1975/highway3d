@@ -7,11 +7,14 @@ warm cinnamon-brown with a cream belly, freckled, and -- because it is a
 cartoon -- a cinnamon-roll swirl on its back. Everything else follows from
 how it thinks:
 
-- a nose far too big for its face, with nostrils that flare: its eyes
-- feathery antennae like a moth's, glowing at the tips when it smells
+- no eyes at all. It has never needed them: the nose, far too big for its
+  face, with nostrils that flare, is how it finds its way, and the feathery
+  antennae, glowing at the tips when it smells, are how it looks round. So
+  when it tells a blind man "neither have I", it means it
 - a wide frog's mouth, because the tongue that lives in it is long enough
   to lick a slate from across a desk
-- big teal eyes for the audience, which it barely uses itself
+- brows on a soft ridge where eyes would be: with no eyes, the brows, the
+  nose, the antennae and the mouth carry every expression
 - a round bean of a body that floats, squashes and stretches, with stubby
   three-fingered arms and little feet that never quite touch anything
 
@@ -35,14 +38,10 @@ NOSE = (0.72, 0.22, 0.26)        # a warm rosy pink
 LIP = (0.40, 0.10, 0.06)
 MOUTH = (0.22, 0.03, 0.06)
 BLUSH = (0.66, 0.18, 0.12)
-BROW = (0.20, 0.05, 0.02)
+BROW = (0.12, 0.03, 0.012)
 ANTENNA = (0.72, 0.42, 0.14)
 GLOW = (0.45, 0.3, 1.0)           # lavender, at the antenna tips
 
-EYE_R = 0.041
-EYE_L_POS = (0.061, -0.098, 0.128)
-EYE_SOCKET = EYE_R + 0.0045
-EYE_TILT = -6.0                    # outer corners up: bright, eager
 
 MOUTH_C = (0.0, -0.163, -0.014)
 MOUTH_HALF_W = 0.066
@@ -50,10 +49,10 @@ SMILE_LIFT = 0.012
 JAW_PIVOT = (0.0, -0.02, 0.0)
 
 CHEEKS = [(0.088, -0.118, 0.05), (-0.088, -0.118, 0.05)]
-BROW_L = (0.062, -0.122, 0.182)
-BROW_R = (-0.062, -0.122, 0.182)
-BROW_INNER_L = (0.03, -0.128, 0.175)
-BROW_INNER_R = (-0.03, -0.128, 0.175)
+BROW_L = (0.058, -0.128, 0.158)
+BROW_R = (-0.058, -0.128, 0.158)
+BROW_INNER_L = (0.028, -0.134, 0.152)
+BROW_INNER_R = (-0.028, -0.134, 0.152)
 
 NOSE_C = (0.0, -0.168, 0.078)
 NOSTRIL_L = (0.02, -0.19, 0.064)
@@ -78,7 +77,7 @@ def lips():
 
 
 def body():
-    """Everything but the eyes, the antennae and the tongue."""
+    """Everything but the antennae and the tongue. (It has no eyes.)"""
     mx, my, mz = MOUTH_C
     lip_up, lip_lo = lips()
     parts = [
@@ -91,9 +90,11 @@ def body():
                           label="cheek", mirror=True), 0.035),
         # a muzzle for the wide mouth
         S.blend(Ellipsoid((0, -0.128, -0.016), (0.094, 0.052, 0.048), color=BODY, label="muzzle"), 0.04),
-        # brow bumps (it has no hair; these carry its eyebrows)
-        S.blend(Ellipsoid((0.058, -0.112, 0.18), (0.034, 0.014, 0.011), R=rot(0, -12, 8),
-                          color=BROW, label="brows", mirror=True), 0.012),
+        # a soft ridge where eyes would be, and the brows on it: with no
+        # eyes they carry the expression, so they are bigger and bolder
+        S.blend(Ellipsoid((0, -0.1, 0.145), (0.1, 0.035, 0.04), color=BODY, label="ridge"), 0.04),
+        S.blend(Ellipsoid((0.058, -0.139, 0.158), (0.043, 0.019, 0.015), R=rot(0, -14, 8),
+                          color=BROW, label="brows", mirror=True), 0.007),
         # the nose: the most important thing on it
         S.blend(Capsule((0, -0.122, 0.13), (0, -0.162, 0.09), 0.017, 0.028, color=NOSE, label="nose"), 0.02),
         S.blend(Sphere(NOSE_C, 0.04, color=NOSE, label="nose"), 0.015),
@@ -123,7 +124,7 @@ def body():
     b = Paint(b, belly, BELLY, soft=0.02, label="belly")
     # freckles over the cheeks and nose bridge, and all down the back
     fr = lambda P: np.clip((S.value_noise(P, 0.0055, 31) - 0.7) / 0.05, 0, 1) * (
-        (np.abs(P[:, 0]) > 0.05) * (P[:, 1] < -0.08) * (np.abs(P[:, 2] - 0.06) < 0.035)
+        (np.abs(P[:, 0]) > 0.05) * (P[:, 1] < -0.08) * (np.abs(P[:, 2] - 0.08) < 0.05)
         + (P[:, 1] > 0.04) * 1.0)
     b = S.PaintFn(b, fr, FRECKLE)
     # the cinnamon-roll swirl on its back
@@ -139,8 +140,6 @@ def body():
     nost = Ellipsoid(NOSTRIL_L, (0.011, 0.014, 0.008), R=rot(-30, 0, 25),
                      color=(0.25, 0.05, 0.06), label="nostril", mirror=True)
     b = Subtract(b, nost, k=0.005)
-    sock = Sphere(EYE_L_POS, EYE_SOCKET, color=BODY, label="socket", mirror=True)
-    b = Subtract(b, sock, k=0.008, color_cut=False)
     slot = Warp(Ellipsoid((mx, my + 0.02, mz), (MOUTH_HALF_W + 0.003, 0.04, 0.0038),
                           color=MOUTH, label="mouth"), smile)
     bag = Ellipsoid((mx, my + 0.06, mz - 0.01), (0.055, 0.045, 0.03), color=MOUTH, label="mouth")

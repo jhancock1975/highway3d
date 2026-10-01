@@ -457,6 +457,9 @@ class Performer:
         self._face("euler", arm, mouth, mood)
 
         # --- hands: right writes and gestures, left rests and beats
+        self._writing = writing
+        self._write_pt = write_pt
+        self._euler_arm = arm
         self._euler_hands(arm, writing, write_pt, mood, talking)
 
     def _to_arm_local(self, p, loc, yaw_deg):
@@ -1000,6 +1003,56 @@ class Performer:
                         self.bk.add(o, "location", path[:, k], index=k)
                         self.bk.add(o, "scale", np.maximum(size, 1e-4), index=k)
 
+    def chalk_pass(self, iterations=3):
+        """Put the chalk's tip where the writing is.
+
+        The IK target is the wrist, and the chalk sits a finger-length beyond
+        it at an angle that depends on the curl -- so aiming the wrist at the
+        board leaves the chalk wherever that geometry happens to put it. For
+        every frame he is writing, measure where the tip actually is, and
+        move the target by the difference. Two passes land it within a few
+        millimetres.
+        """
+        writing = getattr(self, "_writing", None)
+        if writing is None:
+            return
+        frames = [f for f in range(self.f0, self.f1 + 1) if writing[f] > 0.5]
+        # the frames the chalk is meant to be on the slate, not on its way
+        on = set(f for f in frames if writing[f] > 0.98)
+        chalk = bpy.data.objects.get("euler.chalk")
+        if not frames or chalk is None:
+            return
+        arm = self._euler_arm
+        tg = bpy.data.objects["euler.ik.hand.R"]
+        act = tg.animation_data.action
+        fcs = [act.fcurve_ensure_for_datablock(tg, "location", index=i) for i in range(3)]
+        sc = bpy.context.scene
+        a = math.radians(-MK.EULER_YAW)
+        c, s_ = math.cos(a), math.sin(a)
+        nrm = np.array(MK.board_normal())
+        worst = 0.0
+        for it in range(iterations):
+            worst = 0.0
+            for f in frames:
+                sc.frame_set(f)
+                tip = np.array(chalk.matrix_world @ Vector((0, 0, -0.0325)))
+                want = np.array(self._write_pt[f]) + nrm * 0.003
+                d = (want - tip) * writing[f]
+                worst = max(worst, float(np.linalg.norm(d)))
+                local = (d[0] * c - d[1] * s_, d[0] * s_ + d[1] * c, d[2])
+                k = f - self.f0
+                for i in range(3):
+                    kp = fcs[i].keyframe_points[k]
+                    kp.co[1] += local[i]
+            for fc in fcs:
+                fc.update()
+        miss = 0.0
+        for f in sorted(on)[::4]:
+            sc.frame_set(f)
+            tip = np.array(chalk.matrix_world @ Vector((0, 0, -0.0325)))
+            miss = max(miss, float(np.linalg.norm(np.array(self._write_pt[f]) + nrm * 0.003 - tip)))
+        C.log(f"chalk on the slate: {len(on)} frames touching, worst miss {miss * 1000:.1f} mm")
+
     # ------------------------------------------------------------ run
     def run(self):
         self.euler()
@@ -1007,3 +1060,4 @@ class Performer:
         self.props()
         self.bk.bake()
         self.tongue_pass()
+        self.chalk_pass()
