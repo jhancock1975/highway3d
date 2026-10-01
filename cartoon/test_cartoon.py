@@ -89,14 +89,14 @@ def test_timeline():
 
 
 def test_reach():
-    """Everything Euler writes must be reachable from his chair, leaning."""
-    s = MK.euler_point((-0.195, 0.01, 0.935))
-    c = MK.board_point(0.6, 0.5)
-    d = [c[i] - s[i] for i in range(3)]
-    n = math.sqrt(sum(x * x for x in d))
-    lean = [s[i] + 0.25 * d[i] / n for i in range(3)]
-    far = max(math.dist(MK.board_point(u, v), lean) for u0, u1, v, h in MK.BOARD_LAYOUT.values() for u in (u0, u1))
-    check("every formula is within Euler's reach", far < 0.6, f"{far:.2f} m")
+    """Everything Euler writes must be reachable from his chair -- measured
+    from where his shoulder really is when he leans, which is only 6 cm from
+    where it rests. The first check assumed 25 and passed while his hand
+    hung off the slate's edge."""
+    s = MK.euler_point(MK.WRITING_SHOULDER)
+    far = max(math.dist(MK.board_point(u, v), s) for u0, u1, v, h in MK.BOARD_LAYOUT.values()
+              for u in (u0, (u0 + u1) / 2, u1))
+    check("every formula is within Euler's measured reach", far <= MK.CHALK_REACH, f"{far:.2f} m")
 
 
 def test_sculpt():

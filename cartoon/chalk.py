@@ -115,6 +115,29 @@ class Board:
             y0 = int((1 - v) * BH - hh / 2)
             self.glyph[name] = (a, x0, y0)
 
+    def ghosts(self, pngs, layout):
+        """Older work, faint and half rubbed out, gone with the slurp."""
+        import numpy as np
+        from PIL import Image
+        self.ghost = []
+        rng = np.random.default_rng(9)
+        for name, p in pngs.items():
+            if name not in layout:
+                continue
+            u0, u1, v, h = layout[name]
+            im = Image.open(p)
+            a = np.asarray(im.getchannel("A"), np.float32) / 255.0
+            box_w, box_h = (u1 - u0) * BW, h * BH
+            sc = min(box_w / a.shape[1], box_h / a.shape[0])
+            w, hh = max(1, int(a.shape[1] * sc)), max(1, int(a.shape[0] * sc))
+            a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).resize((w, hh), Image.LANCZOS),
+                           np.float32) / 255.0
+            # rubbed: faint, patchy, smeared sideways
+            smear = np.clip(rng.random(a.shape) * 1.4, 0, 1)
+            a = a * 0.32 * smear
+            a = np.maximum(a, np.roll(a, 6, axis=1) * 0.6)
+            self.ghost.append((a, int(u0 * BW), int((1 - v) * BH - hh / 2)))
+
     def _state(self, t):
         """(visible formulas with reveal fraction, wet streaks, wiped)."""
         vis = {}
@@ -157,6 +180,10 @@ class Board:
             ys, xs = slice(max(0, y0), min(BH, y0 + h)), slice(max(0, x0), min(BW, x0 + cut))
             chalk[ys, xs] = np.maximum(chalk[ys, xs], part[: ys.stop - ys.start, : xs.stop - xs.start])
         chalk *= self.grain
+        for a, x0, y0 in getattr(self, "ghost", []):
+            h, w = a.shape
+            ys, xs = slice(max(0, y0), min(BH, y0 + h)), slice(max(0, x0), min(BW, x0 + w))
+            chalk[ys, xs] = np.maximum(chalk[ys, xs], a[: ys.stop - ys.start, : xs.stop - xs.start])
         # wet streaks: a band along the formula the tongue swept, drying out
         for e in wet:
             u0, u1, v, h = self.layout[e["board"]]
@@ -200,7 +227,8 @@ def frames(film, pngs, f0, f1, out_dir, morning=False):
     Frames where nothing changes are written once and hard-linked."""
     from cartoon.sets import marks as MK
     os.makedirs(out_dir, exist_ok=True)
-    b = Board(film, pngs, MK.BOARD_LAYOUT)
+    b = Board(film, {k: v for k, v in pngs.items() if k in MK.BOARD_LAYOUT}, MK.BOARD_LAYOUT)
+    b.ghosts(pngs, MK.GHOST_LAYOUT)
     fps = film["fps"]
     last_key, last_path = None, None
     for f in range(f0, f1 + 1):
