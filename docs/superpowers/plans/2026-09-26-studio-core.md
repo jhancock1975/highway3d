@@ -3311,7 +3311,7 @@ git commit -m "Test the studio's engines end to end and time assembly from real 
 - [ ] **Step 1: Start it**
 
 ```bash
-cd /Users/john/git/adult && PYTHONUNBUFFERED=1 nohup studio/.venv/bin/python -m studio.mcp_server --port 8768 >> ~/Library/Logs/studio-mcp.log 2>&1 &
+cd "$(git rev-parse --show-toplevel)" && PYTHONUNBUFFERED=1 nohup studio/.venv/bin/python -m studio.mcp_server --port 8768 >> ~/Library/Logs/studio-mcp.log 2>&1 &
 sleep 4; lsof -nP -iTCP:8768 -sTCP:LISTEN
 ```
 Expected: one Python process listening on 127.0.0.1:8768.

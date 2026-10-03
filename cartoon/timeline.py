@@ -17,7 +17,7 @@ import math
 import os
 
 from cartoon import script
-from cartoon.sets import marks as MK
+from cartoon.sets import lick as LK, marks as MK
 
 LEAD = 0.14          # seconds of breath before a line
 TAIL = 0.32          # and after it
@@ -65,7 +65,7 @@ def scenes_of(beats):
 
 # ------------------------------------------------------------------ slate
 
-def board_events(beats):
+def board_events(beats, two=None):
     """What happens to the slate, in order: writes, licks, the slurp.
 
     Licks do not erase -- the chalk stays and the tongue leaves a wet streak
@@ -82,8 +82,10 @@ def board_events(beats):
                 t0, t1 = b["start"] + 0.35, b["end"] - 0.35
             ev.append(dict(kind="write", board=b["board"], t0=t0, t1=t1, beat=b["index"]))
         if b["do"] == "lick" and b["target"]:
+            # how far along the tongue gets before the formula goes behind
+            # his head on screen (sets/lick.py); the wet streak stops there too
             ev.append(dict(kind="lick", board=b["target"], t0=b["start"] + 0.45, t1=b["end"] - 0.35,
-                           beat=b["index"]))
+                           beat=b["index"], u_end=LK.reach(two or setups()["two"], b["target"])))
         if b["do"] == "slurp":
             ev.append(dict(kind="slurp", board=None, t0=b["start"] + 0.9, t1=b["end"] - 0.7, beat=b["index"]))
     return ev
@@ -126,8 +128,9 @@ def blocking(beats, events):
             e = lick_of[b["index"]]
             spot = MK.lick_spot(e["board"] or "product")
             if b["do"] == "slurp":
-                spot = MK.lick_spot("product")
-                spot = (spot[0] + 0.1, spot[1] - 0.1, spot[2] + 0.05)
+                # chosen together with the slurp's camera (sets/lick.py)
+                p = LK.slurp_where()
+                spot = (p[0], p[1], p[2] - 0.05)
             go(t0, pos, face="board")
             go(t0 + 0.5, spot, how="zip", face="board", dur=0.5)
             go(t1, spot, face="board")
@@ -242,6 +245,7 @@ def setups():
                                1.15),
                       target=list(MK.board_point(0.62, 0.42)), lens=36),
         "lick": dict(loc=[0, 0, 0], target=[0, 0, 0], lens=30, track="lick"),
+        "slurp": {k: LK.slurp_camera()[k] for k in ("loc", "target", "lens")},
         # from beside the slate, looking back at him as he writes: his face,
         # the chalk hand in the foreground, the board raking away at left
         "euler_write": _write_cam(),
@@ -329,7 +333,9 @@ def plan_shots(beats, scenes):
         elif b["do"] == "write":
             setup = "slate"
         elif b["do"] == "slurp":
-            setup = "lick"
+            # raking along the board from its left (sets/lick.py), so the
+            # tongue is seen taking all of it without crossing Euler's face
+            setup = "slurp"
         elif b["who"] == "euler":
             n_line += 1
             if b["act"] == "write":

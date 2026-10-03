@@ -187,6 +187,7 @@ class Board:
         # wet streaks: a band along the formula the tongue swept, drying out
         for e in wet:
             u0, u1, v, h = self.layout[e["board"]]
+            u1 = min(u1, e.get("u_end", u1))
             prog = _smooth((t - e["t0"]) / max(0.01, e["t1"] - e["t0"]))
             dry = max(0.0, 1.0 - max(0.0, t - e["t1"]) / 6.0)
             if dry <= 0:

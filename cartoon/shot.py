@@ -270,23 +270,14 @@ def set_board(boards_dir, f0):
 
 
 def _lick_camera(film, shot, P, f0, f1):
-    """Side-on to the tongue: perpendicular to the line from Cinnamon to
-    the formula, far enough back to hold both."""
-    import numpy as np
-    mid_f = (f0 + f1) // 2
-    cp = np.array(P.cpos[mid_f]) + np.array([0, 0, 0.05])
+    """See sets/lick.py: the same camera the slate's wet streak and the
+    tongue's reach were worked out for."""
+    from cartoon.sets import lick as LK
     b = next((film["beats"][i] for i in shot["beats"] if film["beats"][i].get("target")), None)
     board = b["target"] if b else "product"
-    u0, u1, v, h = MK.BOARD_LAYOUT[board]
-    bp = np.array(MK.board_point((u0 + u1) / 2, v))
-    m = (cp + bp) / 2
-    d = bp - cp
-    perp = np.array([d[1], -d[0], 0.0])
-    perp /= np.linalg.norm(perp) + 1e-9
-    if perp[1] > 0:           # keep to the camera side of the room (-y)
-        perp = -perp
-    loc = m + perp * 1.35 + np.array([0, 0, 0.12])
-    return dict(loc=list(loc), target=list(m), lens=30)
+    cam = LK.camera(film["setups"]["two"], board)
+    C.log(f"lick camera: {cam['deg']} degrees round from the two-shot, {cam['seen']:.0%} of the chalk and tongue in view")
+    return dict(loc=cam["loc"], target=cam["target"], lens=cam["lens"])
 
 
 def camera(setup, f0, f1, film, P=None, shot=None):

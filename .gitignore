@@ -73,3 +73,10 @@ dist/
 # project-local Blender user dir: MPFB + MakeHuman packs, built by
 # lectern/presenter/setup_human.sh
 lectern/.blender/
+
+# fonts are fetched by fonts.py into .work/fonts, never committed
+*.ttf
+*.otf
+*.ttc
+*.woff
+*.woff2

@@ -76,12 +76,25 @@ anything.
 Euler is drawn from Handmann's 1753 pastel -- the long nose, the knowing
 smile, the right eye narrowed, the floppy satin cap, the teal striped banyan
 -- twenty years older. Cinnamon is a floating cinnamon-brown bean with no
-eyes at all: a nose far too big for its face is how it finds its way, moth
-antennae that glow when it smells are how it looks round, and a frog's mouth
-holds a tongue long enough to lick a slate across a desk. With no eyes, its
-brows (bolder than Euler's, on a soft ridge where eyes would be), nose,
-antennae and mouth carry every expression -- and when it tells a blind man
-"neither have I", it means it.
+eyes and no brows: a nose far too big for its face is how it finds its way,
+moth antennae that glow when it smells are how it looks round, and a small,
+soft, smiling mouth with one buck tooth holds a tongue long enough to lick a
+slate across a desk. The nose, the antennae, the cheeks and the mouth carry
+every expression -- and when it tells a blind man "neither have I", it means
+it.
+
+Its mouth opens by a shape, not a jaw bone (`face.open_key`). A jaw hinged
+behind a face that is all muzzle swung the chin back into the body as it
+opened: a sunken pouch with a sharp rim under the mouth. And only its arms
+follow its arm bones (`rig.limbs_only`): bone heat had given its chest a
+share of them, every gesture opened a seam down its front, and the mouth's
+rosy inside showed through. Its two hands share the finger labels, and from
+the first sculpt its left fingers were weighted to its right hand's bones: when one
+hand moved, a needle of skin stretched from the other. A test now fails the
+build if any vertex follows a bone on the far side. And it bends through its
+whole body when it nods (`_bean_bends`): bone heat had given it a neck it
+does not have, a hinge just under the chin that folded into a V on every
+tilt of the head.
 
 Euler's sleeves are separate pieces weighted only to his arms. Fused to the
 robe, as they were first sculpted, raising an arm to write dragged the robe's
@@ -129,6 +142,40 @@ writing pose, and `test_cartoon.py` checks that against the measured number.
 The far side of the slate carries older work, half rubbed out, that he could
 only have written standing.
 
+## Hands that do not shake
+
+Measured as the gap between each hand's path and a 7-frame smoothing of it,
+before the fixes: 18 mm of jitter on Euler's free hand in ordinary dialogue,
+a 241 mm jump at the end of each formula, a 3 Hz patter of temple taps for
+the length of a line. Each was a rule written as if more motion meant more
+life: a beat gesture on every stressed word, up in four frames; a laugh as a
+4.5 Hz bounce of the hands; a chalk correction that switched on at a
+threshold. Now beats are few, slow and small, the laugh is in his chest, taps
+are two and timed to the word, and every chalk correction eases in and out
+with the writing: 2 mm of jitter in dialogue.
+
+## Nobody inside anybody
+
+Cinnamon's marks are places in the room, and a lick spot was "in front of
+the formula" -- which is where Euler sits, 45 cm out from the slate's
+centre-right. Through every lick of the first three cuts it licked from
+inside his chest. Now it licks from out past the slate's left edge, face to
+face with him at his eye level, and the tongue crosses 60-70 cm of air past
+his nose to the chalk, bowing round his head (`_round_euler`). The lick
+camera finds, per lick, the angle from the audience's side that shows the
+most chalk and tongue past both of them. From there the far end of every
+formula is behind his head, and a tongue sweeping on to it read as a tongue
+running into his mouth, so each lick stops while the tip is still well clear
+of his face on screen -- and the wet streak on the slate stops with it,
+because both come from one function (`sets/lick.py`), checked against his
+rendered silhouette. The slurp, which has to take the whole board, gets its
+own camera, raking along the slate from its left, searched together with
+where Cinnamon hovers (over the slate's top edge) so that none of the chalk
+is hidden behind either of them. Behind all of it, `space_pass`
+pushes Cinnamon out of capsules round Euler's bones on any frame it comes
+too close and logs what it had to do; a test fails if a lick spot comes
+within reach of him again.
+
 ## What a frame costs
 
 Measured on an M5 Max, EEVEE at 1920x1080:
@@ -166,10 +213,23 @@ note of 2026-09-26). The mix ducks the score under every line.
 
 | runs where | does |
 | --- | --- |
-| `cartoon/.venv` | documents, timeline, slate frames, mix, assembly, MCP |
+| `cartoon/.venv` | documents, timeline, slate frames, mix, assembly, MCP; fonttools for the tests |
 | `.ttsvenv` | Kokoro speech; MusicGen score |
 | `lectern/.manimvenv` | typesetting the slate's formulas |
 | Blender | sculpting, rigging, sets, performance, frames |
+
+## Fonts
+
+Every font is under the SIL Open Font License, fetched on first use by
+`fonts.py` at the repo's root from a pinned commit of the Google Fonts
+repository, checked against git's hash of the file, and cached in
+`.work/fonts` -- none is committed. Pinyon Script for the title and chapter
+cards, Libre Caslon Display for the place card, the book spines and the
+visions' labels, STIX Two for their mathematics, and Old Standard for the
+Petersburg signs, which needs Cyrillic. They replaced macOS system fonts
+named by path, which exist on no other system. A character a font has no
+glyph for renders as nothing, so a test checks every string the film draws
+against the font it is drawn in.
 
 ## Assets
 

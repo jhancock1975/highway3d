@@ -37,7 +37,9 @@ rest_lids = arm["lids_rest"]
 def reset():
     for k in kb[1:]:
         k.value = 0.0
-    kb["lips_close"].value = 1.0
+    kb["lips_close"].value = float(arm.get("lips_rest", 1.0))
+    if "smile" in kb:
+        kb["smile"].value = float(arm.get("smile_base", 0.0))
     for pb in arm.pose.bones:
         pb.rotation_quaternion = (1, 0, 0, 0)
         pb.location = (0, 0, 0)
@@ -52,6 +54,9 @@ def reset():
 
 
 def jaw(deg):
+    if arm.get("open_by_key") and "mouth_open" in kb:
+        kb["mouth_open"].value = min(1.2, deg / float(arm.get("jaw_max", 12.0)))
+        return
     arm.pose.bones["jaw"].rotation_quaternion = R.world_rot(arm, "jaw", (1, 0, 0), deg)
 
 
@@ -63,7 +68,7 @@ def lids(up, lo=None):
 
 POSES = {
     "neutral": {},
-    "aa": dict(jaw=16, keys=dict(lips_close=0.0, upper_up=0.3, lower_down=0.4)),
+    "aa": dict(jaw=12, keys=dict(lips_close=0.0, upper_up=0.3, lower_down=0.6)),
     "ee": dict(jaw=5, keys=dict(lips_close=0.1, mouth_wide=0.8, upper_up=0.5, lower_down=0.4)),
     "oo": dict(jaw=7, keys=dict(lips_close=0.2, mouth_narrow=1.0)),
     "mbp": dict(keys=dict(lips_press=1.0)),
