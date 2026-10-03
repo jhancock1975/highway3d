@@ -1,3 +1,9 @@
+# secrets (the vast.ai API key lives in .env) -- never committed; a local
+# pre-commit hook also refuses any commit carrying a value from .env
+.env
+.env.*
+!.env.example
+
 # generated video, stills and audio -- this project's output is binary and
 # large, and none of it belongs in git. 378 MB of unreachable WAV objects
 # were sitting in the pack from staging that never reached a commit.
