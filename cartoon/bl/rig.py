@@ -171,6 +171,87 @@ def segment_weights(P, pts, bones, before=None, blend=0.3):
     return {k: v / tot for k, v in W.items()}
 
 
+def limbs_only(ob, limb_labels, bone_joint: dict, near=0.04, reach=0.09, give_to="body"):
+    """Only the limbs follow the limb bones.
+
+    Bone heat gives the torso next to a limb a share of it, and then every
+    gesture drags that skin along -- a fin under Euler's arm, a crack down
+    Cinnamon's chest. Vertices not labelled as limb keep a limb bone's
+    weight only within `reach` of that bone's root joint, fading from
+    `near`; what they lose goes to `give_to`.
+
+    bone_joint: {bone name prefix with side, e.g. "arm.L": root position}
+    """
+    lab = C.labels_np(ob)
+    P = C.verts_np(ob)
+    target = ob.vertex_groups[give_to]
+    names = {vg.index: vg.name for vg in ob.vertex_groups}
+    moved = 0
+    for vi, v in enumerate(ob.data.vertices):
+        if lab[vi] in limb_labels:
+            continue
+        give = 0.0
+        for g in v.groups:
+            name = names[g.group]
+            root = next((np.array(p) for k, p in bone_joint.items() if name.startswith(k.split(".")[0])
+                         and name.endswith("." + k.split(".")[1])), None)
+            if root is None:
+                continue
+            d = np.linalg.norm(P[vi] - root)
+            keep = 1.0 if d < near else max(0.0, 1.0 - (d - near) / (reach - near))
+            give += g.weight * (1.0 - keep)
+            g.weight *= keep
+        if give > 1e-4:
+            target.add([vi], give, "ADD")
+            moved += 1
+    normalise(ob)
+    C.log(f"{ob.name}: {moved} vertices handed from the limbs to {give_to}")
+
+
+def fill_unweighted(ob, eps=1e-3):
+    """Any vertex left with no weight copies its nearest weighted neighbour.
+
+    A vertex with no weight stays at rest while the bones around it move: a
+    thin dark needle hanging from Cinnamon's hand was one such vertex.
+    """
+    P = C.verts_np(ob)
+    W = {}
+    for v in ob.data.vertices:
+        W[v.index] = [(g.group, g.weight) for g in v.groups if g.weight > eps]
+    empty = [i for i, w in W.items() if not w]
+    if not empty:
+        return 0
+    have = np.array([i for i, w in W.items() if w])
+    from mathutils.kdtree import KDTree
+    kd = KDTree(len(have))
+    for k, i in enumerate(have):
+        kd.insert(P[i], k)
+    kd.balance()
+    for i in empty:
+        _, k, _ = kd.find(P[i])
+        for gi, w in W[int(have[k])]:
+            ob.vertex_groups[gi].add([i], w, "REPLACE")
+    C.log(f"{ob.name}: {len(empty)} unweighted vertices given their neighbour's weights")
+    return len(empty)
+
+
+def smooth_groups(ob, names, factor=0.5, repeat=12):
+    """Blur the boundary between bones that meet where there is no joint to
+    hide it -- Cinnamon's head and body, on a creature with no neck."""
+    bpy.ops.object.select_all(action="DESELECT")
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    for n in names:
+        vg = ob.vertex_groups.get(n)
+        if vg is None:
+            continue
+        ob.vertex_groups.active_index = vg.index
+        bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
+        bpy.ops.object.vertex_group_smooth(group_select_mode="ACTIVE", factor=factor, repeat=repeat)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    normalise(ob)
+
+
 # ------------------------------------------------------------ posing
 
 def world_rot(arm, bone, axis, angle_deg):

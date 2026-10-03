@@ -95,6 +95,19 @@ def quat_local(arm, bone, yaw=0.0, pitch=0.0, roll=0.0):
     return (R.inverted() @ q @ R).to_quaternion()
 
 
+def _two_taps(t, beat, words, depth):
+    """Two deliberate taps timed to the word that matters, not a steady
+    3 Hz patter for the whole line -- which read as a trembling hand."""
+    ws = beat["speech"]["words"]
+    hit = next((w for w in ws if w["text"].lower().strip(".,!?") in words), None)
+    t_hit = hit["start"] if hit else beat["speech"]["start"] + 0.5 * beat["speech"]["duration"]
+    out = np.zeros_like(t)
+    for k in (0, 1):
+        tc = t_hit + 0.32 * k
+        out = np.maximum(out, np.exp(-((t - tc) / 0.06) ** 2))
+    return depth * out
+
+
 class Baker:
     """Collect per-frame values, then write them as linear keyframes."""
 
@@ -295,7 +308,12 @@ class Performer:
         head = bpy.data.objects[arm["head_mesh"]]
         kb = head.data.shape_keys
         keys = {k: np.array(v) for k, v in mouth["keys"].items()}
-        smile = mood["smile"]
+        smile = mood["smile"] + float(arm.get("smile_base", 0.0))
+        if "lips_close" in keys:
+            pp = keys.get("lips_press", 0)
+            keys["lips_close"] = np.maximum(np.minimum(keys["lips_close"], float(arm.get("lips_rest", 1.0))), pp)
+        if "lower_down" in keys:
+            keys["lower_down"] = np.clip(keys["lower_down"] * float(arm.get("lower_down_gain", 1.0)), 0, 1.2)
         keys["smile"] = keys.get("smile", 0) + np.clip(smile, 0, 1) * 0.85
         keys["frown"] = keys.get("frown", 0) + np.clip(-smile, 0, 1) * 0.85
         tl = film.speech_timeline(who)
@@ -321,6 +339,10 @@ class Performer:
         self.bk.add(arm, 'pose.bones["jaw"].rotation_quaternion', None)  # placeholder, replaced below
         self.bk.curves.pop()
         jaw = np.radians(mouth["jaw"])
+        if arm.get("open_by_key") and "mouth_open" in kb.key_blocks:
+            opening = np.clip(np.asarray(mouth["jaw"]) / float(arm.get("jaw_max", 12.0)), 0.0, 1.2)
+            self.bk.add(kb, 'key_blocks["mouth_open"].value', opening)
+            jaw = np.zeros_like(jaw)
         qs = [quat_local(arm, "jaw", 0, j, 0) for j in jaw[self.f0:self.f1 + 1]]
         self._bake_quats(arm, "jaw", qs)
 
@@ -383,7 +405,7 @@ class Performer:
                 s = np.clip((f - f0) / max(1, f1 - f0), 0, 1)
                 u = u0 + (u1 - u0) * s
                 # the chalk bobs up and down along the line: writing
-                wob = 0.25 * h * math.sin(TAU * (f / fps) * 3.1) * (0 < s < 1)
+                wob = 0.08 * h * math.sin(TAU * (f / fps) * 3.1) * (0 < s < 1)
                 write_pt[f] = MK.board_point(u, v + wob / MK.SLATE_H * 0.0 + wob, lift=0.0)
                 writing[f] = max(writing[f], pulse(np.array([f / fps]), e["t0"] - 0.6, 0.55, e["t1"] - e["t0"] + 0.05, 0.5)[0])
         # before Cinnamon comes in, and while writing, he faces the slate
@@ -432,13 +454,17 @@ class Performer:
             if b["who"] == "euler" and b["act"] == "listen":
                 roll += pulse(t, b["start"], 0.5, b["end"] - b["start"] - 1.0, 0.5) * np.radians(10)
             if b["who"] == "euler" and b["act"] == "laugh":
-                shake = pulse(t, b["start"], 0.1, 1.0, 0.6)
-                nod -= shake * (0.12 + 0.05 * np.sin(TAU * 5.0 * t))
+                # head back, a slow rock: a big man's laugh, not a vibration
+                shake = pulse(t, b["start"], 0.2, 1.2, 0.8)
+                nod -= shake * (0.1 + 0.035 * np.sin(TAU * 2.2 * t))
         breath = np.sin(TAU * t / 4.3)
         lean = mood["lean"] * 0.1
         for b in beats:
             if b["who"] == "euler" and b["act"] == "lean_in":
                 lean += pulse(t, b["start"], 0.5, b["end"] - b["start"] - 0.8, 0.6) * 0.14
+            if b["who"] == "euler" and b["act"] == "laugh":
+                w = pulse(t, b["start"], 0.25, 1.4, 0.9)
+                lean -= w * (0.06 + 0.03 * np.sin(TAU * 2.2 * t))
         spine_yaw = writing * np.radians(-22)
         spine_pitch = lean + writing * 0.26 + 0.012 * breath
         spine_roll = writing * np.radians(-12)
@@ -494,8 +520,8 @@ class Performer:
                 if side == ".R" and a == "tap_temple":
                     temple = np.array(MK.euler_point((-0.09, -0.06, 1.2)))
                     tl = self._to_arm_local(temple, MK.EULER, MK.EULER_YAW) + np.array([-0.02, -0.03, -0.03])
-                    w = pulse(t, t0 + 0.6, 0.5, t1 - t0 - 1.6, 0.6)
-                    tap = 0.015 * np.maximum(0, np.sin(TAU * 3.0 * (t - t0))) * w
+                    w = pulse(t, t0 + 0.4, 0.75, t1 - t0 - 2.0, 0.85)
+                    tap = _two_taps(t, b, ("head", "mind", "think"), 0.012) * w
                     P = P * (1 - w[:, None]) + (tl + np.array([0, 0, tap.mean() * 0]))[None, :] * w[:, None]
                     P[:, 0] -= tap
                     rot_off[:, 0] += w * np.radians(-80)
@@ -513,28 +539,36 @@ class Performer:
                 elif side == ".R" and a == "tap_board":
                     bp = self._to_arm_local(np.array(MK.board_point(0.75, 0.43)), MK.EULER, MK.EULER_YAW)
                     w = pulse(t, t0 + 0.2, 0.5, t1 - t0 - 1.1, 0.5)
-                    tap = 0.02 * np.maximum(0, np.sin(TAU * 2.5 * (t - t0))) * w
+                    tap = _two_taps(t, b, ("year", "seventeen", "thirty"), 0.016) * w
                     P = P * (1 - w[:, None]) + (bp + np.array([0.04, 0.04, 0.0]))[None, :] * w[:, None]
                     P[:, 0] += tap
                     rot_off[:, 0] += w * np.radians(-50)
                 elif a == "laugh":
-                    w = pulse(t, t0, 0.2, t1 - t0 - 0.6, 0.4)
-                    P[:, 2] += w * 0.03 * np.abs(np.sin(TAU * 4.5 * t))
+                    # the laugh is in his chest (see euler()); the hands only
+                    # settle onto his belly, they do not bounce -- a 4.5 Hz
+                    # bounce here read as shaking hands
+                    w = pulse(t, t0 + 0.1, 0.4, t1 - t0 - 1.0, 0.6)
+                    P = P + np.array([0.04 if side == ".R" else -0.04, 0.05, 0.03])[None, :] * w[:, None]
                 elif side == ".L" and a in ("lean_in", "sniff"):
                     w = pulse(t, t0 + 0.2, 0.4, t1 - t0 - 0.9, 0.5)
                     P = P + np.array([-0.03, -0.1, 0.12])[None, :] * w[:, None]
-            # beats: the free (left) hand lifts a little on stressed words
+            # beats: the free (left) hand lifts on the words that matter --
+            # few, slow and small. Every stressed word, up in four frames and
+            # down again, read as a nervous twitch, a shake for no reason.
             if side == ".L":
                 beat = np.zeros(n)
+                last = -10.0
                 for b in film.lines_of("euler"):
-                    if b["act"] in ("write", "tap_temple"):
+                    if b["act"] in ("write", "tap_temple", "laugh"):
                         continue
                     for wd in b["speech"]["words"]:
-                        if "ˈ" in wd.get("phonemes", "") and wd["end"] - wd["start"] > 0.25:
-                            beat = np.maximum(beat, pulse(t, wd["start"] - 0.2, 0.18, 0.12, 0.45))
-                beat = beat * (0.3 + 0.9 * mood["energy"])
-                P = P + np.array([-0.02, -0.07, 0.1])[None, :] * beat[:, None]
-                rot_off[:, 0] += beat * np.radians(-25)
+                        if "ˈ" in wd.get("phonemes", "") and wd["end"] - wd["start"] > 0.3 \
+                                and wd["start"] - last > 1.6:
+                            beat = np.maximum(beat, pulse(t, wd["start"] - 0.35, 0.4, 0.2, 0.9))
+                            last = wd["start"]
+                beat = smooth_series(beat * (0.25 + 0.6 * mood["energy"]), fps, 0.08)
+                P = P + np.array([-0.015, -0.045, 0.06])[None, :] * beat[:, None]
+                rot_off[:, 0] += beat * np.radians(-18)
             # a little life even at rest
             P = P + np.array([0.004, 0.004, 0.006])[None, :] * np.stack(
                 [noise1(n, fps, 3.0, 20 + i + (0 if side == ".L" else 5)) for i in range(3)], 1)
@@ -610,7 +644,8 @@ class Performer:
             return
         film = self.film
         n, fps, t = film.n, film.fps, film.t
-        mouth, talking = mouth_channels(film, "cinnamon", jaw_scale=34, jaw_max=20)
+        mouth, talking = mouth_channels(film, "cinnamon", jaw_scale=float(arm.get("jaw_scale", 34)),
+                                        jaw_max=float(arm.get("jaw_max", 20)))
         mood = mood_channels(film, "cinnamon", "euler", empathy=0.35, tau=0.22)
         pos = self.cpos.copy()
         # hover: a slow bob and a slower sway, bigger when excited
@@ -643,7 +678,9 @@ class Performer:
         vel = np.gradient(pos, axis=0) * fps
         speed = np.linalg.norm(vel[:, :2], axis=1)
         travel = np.unwrap(np.arctan2(vel[:, 0], -vel[:, 1]))
-        mix = np.clip((speed - 0.4) / 0.8, 0, 1)
+        # only a real dash turns it to face where it is going; on a lazy
+        # drift home it keeps facing Euler (not the back of its head to us)
+        mix = np.clip((speed - 1.2) / 0.8, 0, 1)
         # bring travel angle into yaw's branch before mixing
         travel = yaw + np.angle(np.exp(1j * (travel - yaw)))
         yaw = yaw * (1 - mix) + travel * mix
@@ -697,7 +734,8 @@ class Performer:
             if b["who"] == "cinnamon" and b["act"] in ("savour",):
                 taste = np.maximum(taste, pulse(t, b["start"], 0.3, b["end"] - b["start"] - 0.5, 0.4) * 0.8)
         sniff_bob = sniff * 0.08 * np.maximum(0, np.sin(TAU * 3.2 * t))
-        self._bake_ypr(arm, "head", np.zeros(n), -(nod + sniff_bob) * 1.0 + 0.1 * mood["lean"], tilt)
+        # gentler than a creature with a neck: the whole bean bends with it
+        self._bake_ypr(arm, "head", np.zeros(n), (-(nod + sniff_bob) + 0.1 * mood["lean"]) * 0.7, tilt * 0.7)
         self._bake_ypr(arm, "body", np.zeros(n), -0.05 * mood["lean"] + 0.03 * hop, 0.4 * tilt)
 
         # eyes: on Euler, on the slate while licking, shut while tasting
@@ -713,8 +751,18 @@ class Performer:
         self._eyes(arm, eyaw, epitch, up_open, lo_open)
         flare = np.clip(sniff * (0.5 + 0.5 * np.maximum(0, np.sin(TAU * 3.2 * t))) + taste * 0.4
                         + 0.15 * np.maximum(0, np.sin(TAU * t / 2.3)) ** 8, 0, 1)
+        # the mouth opens whenever the tongue is out -- licks, the slurp, the
+        # fanning -- or the tongue would come out through closed lips
+        tongue_out = np.zeros(n)
+        for b in film.beats:
+            if b["do"] in ("lick", "slurp"):
+                tongue_out = np.maximum(tongue_out, pulse(t, b["start"] + 0.3, 0.25, b["end"] - b["start"] - 0.7, 0.3))
+            if b["who"] == "cinnamon" and b["act"] == "fan_tongue":
+                tongue_out = np.maximum(tongue_out, pulse(t, b["start"] + 0.1, 0.25, b["end"] - b["start"] - 0.5, 0.3))
         self._face("cinnamon", arm, mouth, mood, extra={"nostril_flare": flare,
-                                                        "nose_scrunch": sniff * 0.3})
+                                                        "nose_scrunch": sniff * 0.3,
+                                                        "mouth_open": tongue_out * 0.75,
+                                                        "lips_close": -tongue_out * 1.2})
         self._cinnamon_arms(arm, mood, talking, pos, yaw)
         self._antennae(arm, pos, yaw, mood, sniff, taste)
         self._tongue(arm, pos, yaw)
@@ -788,10 +836,13 @@ class Performer:
             for b in film.lines_of("cinnamon"):
                 if b["act"] in ("count", "fan_tongue", "pinch", "touch_hand"):
                     continue
+                last = -10.0
                 for wd in b["speech"]["words"]:
-                    if "ˈ" in wd.get("phonemes", "") and wd["end"] - wd["start"] > 0.2:
-                        beat = np.maximum(beat, pulse(t, wd["start"] - 0.15, 0.15, 0.1, 0.35))
-            P = P + np.array([sx * 0.02, -0.04, 0.06])[None, :] * (beat * (0.4 + mood["energy"]))[:, None]
+                    if "ˈ" in wd.get("phonemes", "") and wd["end"] - wd["start"] > 0.22 and wd["start"] - last > 1.0:
+                        beat = np.maximum(beat, pulse(t, wd["start"] - 0.25, 0.3, 0.15, 0.6))
+                        last = wd["start"]
+            beat = smooth_series(beat, fps, 0.06)
+            P = P + np.array([sx * 0.02, -0.04, 0.06])[None, :] * (beat * (0.35 + 0.7 * mood["energy"]))[:, None]
             for i in range(3):
                 self.bk.add(tg, "location", P[:, i], index=i)
             qs = [Quaternion((0, 0, 1), rot[f, 2]) @ Quaternion((0, 1, 0), rot[f, 1]) @
@@ -873,6 +924,40 @@ class Performer:
             self._tongue_jobs.append((kind, b, f0, f1))
         self._tongue_obj = tongue
 
+    def _round_euler(self, pts, clear=0.03, iterations=4):
+        """Bow the tongue round Euler's head and arms, ends fixed.
+
+        The formulas are within his reach, so a tongue from across the
+        slate passes right by his nose; a straight one went through it.
+        Each round finds the point that is deepest inside him and bows the
+        whole tongue out by enough to clear it, the most in the middle and
+        none at the mouth or the chalk.
+        """
+        eu = getattr(self, "_euler_arm", None)
+        if eu is None:
+            return pts
+        pw = eu.matrix_world
+        caps = [(np.array(pw @ getattr(eu.pose.bones[a], ae)), np.array(pw @ getattr(eu.pose.bones[b], be)), r)
+                for a, ae, b, be, r in self.EULER_BODY]
+        P = np.array(pts, float)
+        k = len(P)
+        bow = np.sin(np.pi * np.arange(k) / (k - 1))
+        for _ in range(iterations):
+            worst, at, dirn = 0.0, 0, None
+            for i in range(1, k - 1):
+                for a, b, r in caps:
+                    ab = b - a
+                    t = np.clip(np.dot(P[i] - a, ab) / max(np.dot(ab, ab), 1e-9), 0, 1)
+                    q = a + t * ab
+                    d = np.linalg.norm(P[i] - q)
+                    deficit = r + clear - d
+                    if deficit > worst:
+                        worst, at, dirn = deficit, i, (P[i] - q) / max(d, 1e-6)
+            if worst <= 1e-4:
+                break
+            P += np.outer(bow / max(bow[at], 0.2), dirn * worst)
+        return [p for p in P]
+
     def tongue_pass(self):
         """Call after bake(): keys the tongue's points for lick frames."""
         if not getattr(self, "_tongue_jobs", None):
@@ -891,8 +976,12 @@ class Performer:
             cu.animation_data.action = bpy.data.actions.new("tongue.perf")
         act = cu.animation_data.action
         frames_done = {}
+        # how far along each lick goes was settled with the slate's wet
+        # streak (sets/lick.py, via the timeline's slate events)
+        reach_of = {e["beat"]: e.get("u_end", 1.0) for e in film.f.get("board", []) if e["kind"] == "lick"}
         for kind, b, f0, f1 in self._tongue_jobs:
             board = b.get("target") or "product"
+            u_end = reach_of.get(b["index"], 1.0)
             for f in range(max(f0, self.f0), min(f1, self.f1) + 1):
                 sc.frame_set(f)
                 M = tongue.matrix_world.copy()
@@ -903,6 +992,7 @@ class Performer:
                     u0, u1, v, h = MK.BOARD_LAYOUT[board]
                     if kind == "slurp":
                         u0, u1, v = 0.1, 1.0, 0.5
+                    u1 = min(u1, u_end)
                     if s < 0.22:
                         out = ease(s / 0.22)
                         u = u0
@@ -915,26 +1005,29 @@ class Performer:
                     vv = v + (0.35 * math.sin(TAU * s * 3) if kind == "slurp" else 0.0)
                     tip = np.array(MK.board_point(u, vv, lift=0.004))
                 else:
-                    out = 0.55 * pulse(np.array([s]), 0.0, 0.15, 0.7, 0.15)[0]
+                    out = 0.8 * pulse(np.array([s]), 0.0, 0.15, 0.7, 0.15)[0]
                     fwd = np.array(M.to_3x3() @ Vector((0, -1, 0)))
-                    tip = mouth_w + fwd * 0.12 + np.array([0, 0, -0.08]) + 0.02 * math.sin(TAU * 4 * f / fps)
-                # a path from the mouth to the tip, sagging a little, the last
-                # stretch lying along the board
+                    # hanging out of the mouth in front of the chin, flapping
+                    tip = mouth_w + fwd * 0.11 + np.array([0, 0, -0.05]) \
+                        + np.array([0.012 * math.sin(TAU * 4 * f / fps), 0, 0])
+                # out through the lips, then on to the tip: a quadratic Bezier
+                # from inside the mouth, through a point just in front of the
+                # lips. A straight line from inside the mouth to a tip below it
+                # came out through the chin.
+                from cartoon.characters.cinnamon_shape import MOUTH_C
+                mx, my, mz = MOUTH_C
+                lips = np.array(M @ Vector((mx, my - 0.03, mz - 0.006)))
                 pts = []
                 nrm = np.array(MK.board_normal())
                 for i in range(TONGUE_POINTS):
                     a = i / (TONGUE_POINTS - 1)
-                    if a <= 0.25:
-                        p = np.array(M @ Vector(rest[int(a / 0.25 * (len(rest) - 1) * 0.3)]))
-                        p = np.array(M @ Vector(rest[i])) if out < 0.05 else p
-                    q = mouth_w + (tip - mouth_w) * a
-                    sag = math.sin(math.pi * a) * 0.05 * out
-                    q = q + np.array([0, 0, -sag])
+                    q = (1 - a) ** 2 * mouth_w + 2 * (1 - a) * a * lips + a ** 2 * tip
                     if kind in ("lick", "slurp"):
                         q = q + nrm * 0.01 * math.sin(math.pi * a) * out
                     rw = np.array(M @ Vector(rest[i]))
-                    p = rw * (1 - out) + q * out
-                    pts.append(p)
+                    pts.append(rw * (1 - out) + q * out)
+                if kind in ("lick", "slurp"):
+                    pts = self._round_euler(pts)
                 for i, p in enumerate(pts):
                     lp = Mi @ Vector(p)
                     frames_done.setdefault(i, []).append((f, lp))
@@ -1003,55 +1096,259 @@ class Performer:
                         self.bk.add(o, "location", path[:, k], index=k)
                         self.bk.add(o, "scale", np.maximum(size, 1e-4), index=k)
 
-    def chalk_pass(self, iterations=3):
-        """Put the chalk's tip where the writing is.
+    # Euler as capsules on his bones: (from bone, from end, to bone, to end,
+    # radius). Generous: his cap and hair stand off his skull, and his
+    # waistcoat off his ribs.
+    EULER_BODY = (
+        ("root", "head", "neck", "head", 0.20),
+        ("head", "head", "head", "tail", 0.17),
+        ("upper_arm.L", "head", "upper_arm.L", "tail", 0.075),
+        ("upper_arm.R", "head", "upper_arm.R", "tail", 0.075),
+        ("forearm.L", "head", "forearm.L", "tail", 0.065),
+        ("forearm.R", "head", "forearm.R", "tail", 0.065),
+    )
+    # Cinnamon as spheres in its own frame: lower bean, upper bean, nose
+    CINNAMON_BODY = (((0.0, 0.0, -0.07), 0.16), ((0.0, -0.02, 0.09), 0.16), ((0.0, -0.15, 0.06), 0.07))
 
-        The IK target is the wrist, and the chalk sits a finger-length beyond
-        it at an angle that depends on the curl -- so aiming the wrist at the
-        board leaves the chalk wherever that geometry happens to put it. For
-        every frame he is writing, measure where the tip actually is, and
-        move the target by the difference. Two passes land it within a few
-        millimetres.
+    def space_pass(self, iterations=3, margin=0.02):
+        """Keep Cinnamon out of Euler.
+
+        Its marks are places in the room, and a lick spot is wherever the
+        formula is -- 38 cm out from the slate, which is where Euler sits,
+        and through every lick of the first three cuts its body was inside
+        his chest with his chin poking through it. The lick spots have moved
+        (marks.lick_spot); this is what catches the next one. Every frame it
+        comes near him, it is pushed out of capsules round his bones, and
+        the push is smoothed in time so it drifts clear rather than popping.
+        Runs before the tongue is aimed, which then reaches from wherever it
+        ends up.
+        """
+        cin = self.rigs.get("cinnamon")
+        eu = getattr(self, "_euler_arm", None)
+        if cin is None or eu is None or cin.animation_data is None:
+            return
+        act = cin.animation_data.action
+        floc = [act.fcurve_ensure_for_datablock(cin, "location", index=i) for i in range(3)]
+        sc = bpy.context.scene
+        # frames worth testing: where its planned path comes within reach of
+        # him at rest, with room for how far he leans
+        rest = eu.matrix_world
+        bones = eu.data.bones
+        caps0 = [(np.array(rest @ getattr(bones[a], "head_local" if ae == "head" else "tail_local")),
+                  np.array(rest @ getattr(bones[b], "head_local" if be == "head" else "tail_local")), r)
+                 for a, ae, b, be, r in self.EULER_BODY]
+
+        def seg_dist(c, a, b):
+            ab = b - a
+            t = np.clip(np.dot(c - a, ab) / max(np.dot(ab, ab), 1e-9), 0.0, 1.0)
+            q = a + t * ab
+            return np.linalg.norm(c - q), q
+
+        frames = []
+        for f in range(self.f0, self.f1 + 1):
+            c = self.cpos[f]
+            if min(seg_dist(c, a, b)[0] - r for a, b, r in caps0) < 0.16 + 0.35:
+                frames.append(f)
+        if not frames:
+            return
+        key = lambda f: f - self.f0
+        n = self.f1 - self.f0 + 1
+        # hide the meshes while stepping frames: only the bones are needed
+        hidden = [o for o in sc.objects if o.type == "MESH" and not o.hide_viewport]
+        for o in hidden:
+            o.hide_viewport = True
+
+        def sample():
+            push = np.zeros((n, 3))
+            worst = 0.0
+            for f in frames:
+                sc.frame_set(f)
+                mw = cin.matrix_world
+                pw = eu.matrix_world
+                caps = [(np.array(pw @ getattr(eu.pose.bones[a], ae)), np.array(pw @ getattr(eu.pose.bones[b], be)), r)
+                        for a, ae, b, be, r in self.EULER_BODY]
+                best = np.zeros(3)
+                for lc, rc in self.CINNAMON_BODY:
+                    c = np.array(mw @ Vector(lc))
+                    for a, b, r in caps:
+                        d, q = seg_dist(c, a, b)
+                        need = r + rc + margin
+                        if d < need:
+                            v = (c - q) / max(d, 1e-6) * (need - d)
+                            if np.linalg.norm(v) > np.linalg.norm(best):
+                                best = v
+                # nor through the slate: its spheres stay in front of the face
+                for lc, rc in self.CINNAMON_BODY:
+                    c = np.array(mw @ Vector(lc)) + best
+                    rel = c - slate_o
+                    u, v, d = rel @ slate_u, rel @ slate_v, rel @ slate_n
+                    if -0.1 < u < MK.SLATE_W + 0.1 and -0.1 < v < MK.SLATE_H + 0.15 and -0.4 < d < rc + margin:
+                        best = best + slate_n * (rc + margin - d)
+                push[key(f)] = best
+                worst = max(worst, float(np.linalg.norm(best)))
+            return push, worst
+
+        slate_o = np.array(MK.board_point(0.0, 0.0))
+        slate_u = np.array(MK.board_point(1.0, 0.0)) - slate_o
+        slate_u /= np.linalg.norm(slate_u)
+        slate_v = np.array(MK.board_point(0.0, 1.0)) - slate_o
+        slate_v /= np.linalg.norm(slate_v)
+        slate_n = np.array(MK.board_normal())
+        total = np.zeros((n, 3))
+        moved = 0
+        try:
+            for it in range(iterations):
+                push, worst = sample()
+                if worst < 1e-4:
+                    break
+                # spread each push over a third of a second either side, so it
+                # starts to drift clear before it would touch him
+                sm = np.stack([smooth_series(push[:, i], self.film.fps, 0.12) for i in range(3)], 1)
+                peak = np.linalg.norm(push, axis=1).max()
+                speak = np.linalg.norm(sm, axis=1).max()
+                if speak > 1e-9:
+                    sm *= min(3.0, peak / speak)
+                total += sm
+                for i in range(3):
+                    for k in range(n):
+                        floc[i].keyframe_points[k].co[1] += sm[k, i]
+                    floc[i].update()
+                moved = int((np.linalg.norm(total, axis=1) > 0.002).sum())
+            _, left = sample()
+        finally:
+            for o in hidden:
+                o.hide_viewport = False
+        # the cameras that follow it frame where it is, not where it was meant to be
+        self.cpos[self.f0:self.f1 + 1] += total
+        C.log(f"Cinnamon clear of Euler: {moved} frames moved, largest move "
+              f"{np.linalg.norm(total, axis=1).max() * 100:.1f} cm, worst overlap left {left * 1000:.1f} mm")
+
+    def chalk_pass(self, iterations=3):
+        """Put the chalk's tip where the writing is, from in front of the slate.
+
+        The IK target is the wrist, and the chalk sits in the fist beside the
+        line of the arm. Two things have to be steered, in this order:
+
+        1. which way the chalk points. Steering only the tip onto the text
+           let the hand reach *through* the slate -- measured, 95% of it sat
+           up to 14 cm behind the writing surface with the chalk poking out
+           of the front, which reads as a transparent hand. So first the
+           hand is turned until the chalk points into the slate the way a
+           pen points into paper, the fist in front of it;
+        2. where the tip is: then the target moves by the tip's miss.
+
+        Every correction is scaled by the writing weight (which eases in and
+        out), so nothing switches on at a threshold -- an earlier version
+        did, and the hand jumped 24 cm at the end of each formula -- and the
+        result is lightly smoothed in time so per-frame corrections cannot
+        add a shake of their own.
         """
         writing = getattr(self, "_writing", None)
         if writing is None:
             return
-        frames = [f for f in range(self.f0, self.f1 + 1) if writing[f] > 0.5]
-        # the frames the chalk is meant to be on the slate, not on its way
-        on = set(f for f in frames if writing[f] > 0.98)
+        frames = [f for f in range(self.f0, self.f1 + 1) if writing[f] > 0.01]
         chalk = bpy.data.objects.get("euler.chalk")
         if not frames or chalk is None:
             return
+        on = [f for f in frames if writing[f] > 0.98]
         arm = self._euler_arm
         tg = bpy.data.objects["euler.ik.hand.R"]
         act = tg.animation_data.action
-        fcs = [act.fcurve_ensure_for_datablock(tg, "location", index=i) for i in range(3)]
+        floc = [act.fcurve_ensure_for_datablock(tg, "location", index=i) for i in range(3)]
+        frot = [act.fcurve_ensure_for_datablock(tg, "rotation_quaternion", index=i) for i in range(4)]
         sc = bpy.context.scene
-        a = math.radians(-MK.EULER_YAW)
-        c, s_ = math.cos(a), math.sin(a)
-        nrm = np.array(MK.board_normal())
-        worst = 0.0
+        R_arm = arm.matrix_world.to_quaternion()
+        R_inv = R_arm.inverted()
+        nrm = Vector(MK.board_normal())
+        up = (Vector(MK.board_point(0.5, 1.0)) - Vector(MK.board_point(0.5, 0.0))).normalized()
+        away = (Vector(MK.board_point(0.0, 0.5)) - Vector(MK.board_point(1.0, 0.5))).normalized()
+        # into the slate, tipped a little up and away from him: a pen's angle
+        want_dir = (-nrm + up * 0.3 + away * 0.25).normalized()
+        a_ = math.radians(-MK.EULER_YAW)
+        c, s_ = math.cos(a_), math.sin(a_)
+
+        def key(f):
+            return f - self.f0
+
+        def get_loc(f):
+            return Vector([floc[i].keyframe_points[key(f)].co[1] for i in range(3)])
+
+        def get_rot(f):
+            return Quaternion([frot[i].keyframe_points[key(f)].co[1] for i in range(4)])
+
+        def set_loc(f, v):
+            for i in range(3):
+                floc[i].keyframe_points[key(f)].co[1] = v[i]
+
+        def set_rot(f, q):
+            for i in range(4):
+                frot[i].keyframe_points[key(f)].co[1] = q[i]
+
+        def update():
+            for fc in floc + frot:
+                fc.update()
+
+        def ends():
+            tip = chalk.matrix_world @ Vector((0, 0, -0.0325))
+            butt = chalk.matrix_world @ Vector((0, 0, 0.0325))
+            return tip, butt
+
         for it in range(iterations):
-            worst = 0.0
+            # 1. aim the chalk
             for f in frames:
                 sc.frame_set(f)
-                tip = np.array(chalk.matrix_world @ Vector((0, 0, -0.0325)))
-                want = np.array(self._write_pt[f]) + nrm * 0.003
-                d = (want - tip) * writing[f]
-                worst = max(worst, float(np.linalg.norm(d)))
-                local = (d[0] * c - d[1] * s_, d[0] * s_ + d[1] * c, d[2])
-                k = f - self.f0
-                for i in range(3):
-                    kp = fcs[i].keyframe_points[k]
-                    kp.co[1] += local[i]
-            for fc in fcs:
-                fc.update()
+                tip, butt = ends()
+                d = (tip - butt).normalized()
+                q = d.rotation_difference(want_dir)
+                q = Quaternion().slerp(q, float(writing[f]))
+                set_rot(f, (R_inv @ q @ R_arm @ get_rot(f)).normalized())
+            update()
+            # 2. put the tip on the text
+            for f in frames:
+                sc.frame_set(f)
+                tip, _ = ends()
+                want = Vector(self._write_pt[f]) + nrm * 0.003
+                d = (want - tip) * float(writing[f])
+                local = Vector((d.x * c - d.y * s_, d.x * s_ + d.y * c, d.z))
+                set_loc(f, get_loc(f) + local)
+            update()
+        # 3. smooth in time over the writing stretch (5-frame window)
+        locs = {f: get_loc(f) for f in frames}
+        rots = {f: get_rot(f) for f in frames}
+        for f in frames:
+            nb = [g for g in range(f - 2, f + 3) if g in locs]
+            set_loc(f, sum((locs[g] for g in nb), Vector()) / len(nb))
+            q = rots[f].copy()
+            for g in nb:
+                if g != f:
+                    q = q.slerp(rots[g], 1.0 / len(nb))
+            set_rot(f, q.normalized())
+        update()
+        # measure: where the tip is, and whether any of the hand is behind
+        # the slate's face
+        hand = bpy.data.objects.get("euler.hand.R")
+        o = Vector(MK.board_point(0.5, 0.5))
         miss = 0.0
-        for f in sorted(on)[::4]:
+        behind = 0.0
+        for f in on[::6]:
             sc.frame_set(f)
-            tip = np.array(chalk.matrix_world @ Vector((0, 0, -0.0325)))
-            miss = max(miss, float(np.linalg.norm(np.array(self._write_pt[f]) + nrm * 0.003 - tip)))
-        C.log(f"chalk on the slate: {len(on)} frames touching, worst miss {miss * 1000:.1f} mm")
+            tip, _ = ends()
+            miss = max(miss, (Vector(self._write_pt[f]) + nrm * 0.003 - tip).length)
+            if hand is not None:
+                dg = bpy.context.evaluated_depsgraph_get()
+                ev = hand.evaluated_get(dg)
+                me = ev.to_mesh()
+                mw = hand.matrix_world
+                co = np.empty(len(me.vertices) * 3)
+                me.vertices.foreach_get("co", co)
+                co = co.reshape(-1, 3)[::7]
+                M = np.array(mw)
+                wc = co @ M[:3, :3].T + M[:3, 3]
+                deep = float(((wc - np.array(o)) @ np.array(nrm)).min())
+                ev.to_mesh_clear()
+                behind = min(behind, deep)
+        C.log(f"chalk on the slate: {len(on)} frames touching, worst miss {miss * 1000:.1f} mm, "
+              f"deepest hand point {behind * 1000:.1f} mm behind the slate")
 
     # ------------------------------------------------------------ run
     def run(self):
@@ -1059,5 +1356,6 @@ class Performer:
         self.cinnamon()
         self.props()
         self.bk.bake()
+        self.space_pass()
         self.tongue_pass()
         self.chalk_pass()

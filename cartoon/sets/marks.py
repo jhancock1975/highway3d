@@ -100,16 +100,27 @@ def watch_spot():
     """Where Cinnamon hovers while Euler writes: up over the slate's top
     edge and a little behind it, peering down at the chalk -- facing the
     audience and well clear of the writing shot's lens. (Hovering over the
-    front corner put the back of its head in the foreground of that shot.)"""
-    p = board_point(0.55, 1.4, lift=-0.12)
+    front corner put the back of its head in the foreground of that shot;
+    hovering just over the edge left it in the top of the frame for whole
+    shots, cut off at the chin, its face behind the easel post. It goes up
+    out of the shot and comes back down when he has finished.)"""
+    p = board_point(0.55, 2.0, lift=-0.12)
     return (p[0], p[1], p[2])
 
 
 def lick_spot(board: str):
-    """Where Cinnamon hovers to lick a formula: in front of its middle."""
+    """Where Cinnamon hovers to lick a formula: out past the slate's left
+    edge, well clear of Euler, and the tongue goes the rest of the way.
+
+    In front of the formula's middle, where it used to hover, is where
+    Euler sits -- 45 cm out from the slate's centre-right -- and it licked
+    from inside his chest. From here the tongue crosses 60-70 cm of air to
+    the chalk, which is the joke anyway."""
     u0, u1, v, h = BOARD_LAYOUT[board]
-    p = board_point((u0 + u1) / 2, v, lift=0.38)
-    return (p[0], p[1], p[2] - 0.04)
+    p = board_point(max(0.05, u0 - 0.38), v + 0.08, lift=0.48)
+    # never below his eyes: hovering level with a formula low on the slate
+    # put its body between the camera and its own tongue
+    return (p[0], p[1], max(p[2], HEAD_EULER[2] - 0.02))
 
 
 HEAD_EULER = euler_point((0.0, -0.06, 1.16))

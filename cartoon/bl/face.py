@@ -39,7 +39,7 @@ def _gauss(P, c, sig):
     return np.exp(-np.sum((d / np.asarray(sig)) ** 2, 1))
 
 
-def jaw_weights(P, mouth_c, half_w, smile_lift=0.0075, back_y=0.03, reach=None):
+def jaw_weights(P, mouth_c, half_w, smile_lift=0.0075, back_y=0.03, reach=None, radius=None):
     """How much of each vertex goes with the jaw.
 
     Sharp inside the mouth, where the split runs through the slot and so
@@ -59,6 +59,12 @@ def jaw_weights(P, mouth_c, half_w, smile_lift=0.0075, back_y=0.03, reach=None):
         # muzzle, not the belly under it
         w *= _ss(-reach, -reach * 0.25, v)
         w *= _ss(half_w * 1.9, half_w * 1.2, np.abs(P[:, 0] - mx))
+    if radius is not None:
+        # or a soft round region round the lower lip: straight cut-offs at
+        # the sides and below showed as edges -- a pale bib swinging down the
+        # chest every time the mouth opened
+        lo = np.array([mx, my, mz - 0.012])
+        w *= _ss(radius, radius * 0.35, np.linalg.norm(P - lo, axis=1))
     return w
 
 
@@ -135,6 +141,34 @@ def mouth_keys(P, mouth_c, half_w, lip_upper, lip_lower, cheeks, smile_lift=0.00
     d[:, 1] = 0.004 * w_lo
     K["lower_in"] = d
     return K
+
+
+def open_key(P, mouth_c, half_w, smile_lift=0.0075, drop=0.02, sigma=0.04):
+    """Open the mouth by lowering the lower lip and chin, not by hinging a jaw.
+
+    For a creature whose face is all muzzle, a jaw bone turning about a pivot
+    behind the face swings the chin *back* into the body as it opens: a
+    sunken pouch with a sharp U-shaped rim under the mouth. This moves the
+    lower half straight down (and a hair forward), fading as a Gaussian in
+    every direction, so there is nothing to fold. The split between the lips
+    is sharp only inside the mouth, where it runs through empty space.
+    """
+    mx, my, mz = mouth_c
+    u = np.clip((P[:, 0] - mx) / half_w, -1.4, 1.4)
+    v = P[:, 2] - (mz + smile_lift * u * u)
+    lat = np.maximum(0.0, np.abs(P[:, 0] - mx) - half_w * 0.95)
+    band = 0.0012 + 0.6 * lat
+    # sharp between the lips; but anything clearly below the mouth line is
+    # simply "lower", whatever its x -- otherwise a mouth-wide column moved
+    # with hard side edges and showed as a pale strip down the chest
+    lower = np.maximum(_ss(-1.0, 1.0, -v / band), _ss(-0.003, -0.018, v))
+    lo = np.array([mx, my, mz - 0.01])
+    g = np.exp(-np.sum(((P - lo) / np.array((sigma * 1.4, sigma * 1.6, sigma))) ** 2, 1))
+    w = lower * g
+    d = np.zeros_like(P)
+    d[:, 2] = -drop * w
+    d[:, 1] = -0.003 * w
+    return {"mouth_open": d}
 
 
 def brow_keys(P, brow_l, brow_r, cheek_l, cheek_r, inner_l, inner_r, sig=0.03):

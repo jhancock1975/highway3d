@@ -12,7 +12,7 @@ has that he does not:
   cinnamon.tongue                         a curve: its points and
                                           bevel_factor_end are the lick
   body mesh shape keys                    bl/face.py, plus nostril_flare
-  (no eyes: the brows, the nose and the antennae carry the expression)
+  (no eyes, no brows: the nose, cheeks, mouth and antennae carry it)
 """
 
 from __future__ import annotations
@@ -105,20 +105,31 @@ def build(coll=None, voxel=0.0028):
 
     # no eyes: it has never needed them
     eyes = {}
+    tooth = C.mesh_from_field(NAME + ".tooth", X.tooth(), *X.TOOTH_BOUNDS, 0.0008, coll)
+    tooth.data.materials.append(C.mat_attr("cinnamon.tooth", rough=0.25, sss=0.2, coat=0.4))
 
     arm = R.armature(NAME + ".rig", bones(), coll)
     keep = {b["name"] for b in bones() if not b["name"].startswith("ant_") and b["name"] != "jaw"
             and not b["name"].startswith("f_")}
     R.skin_auto(body, arm, keep=keep)
+    limb_bones = {}
+    for side in (".L", ".R"):
+        for b in ("arm", "forearm", "hand"):
+            limb_bones[b + side] = X.J["arm" + side]
+    R.limbs_only(body, {"arm", "hand", "f1", "f2", "f3", "foot"}, limb_bones, near=0.035, reach=0.085)
     # jaw, and fingers by segment, on top of the heat weights
     P = C.verts_np(body)
     lab = C.labels_np(body)
-    wj = F.jaw_weights(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, back_y=0.0, reach=0.1)
+    wj = F.jaw_weights(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, back_y=0.0, radius=0.09)
     wj[lab == "hand"] = 0
     _blend_group(body, "jaw", wj, take_from=["head", "body"])
     for s, sx in ((".L", 1), (".R", -1)):
         for name in X.FINGER_OFFSETS:
-            m = lab == name
+            # this hand's fingers only: both hands share the labels f1..f3,
+            # and without the side test the right hand's weights overwrote
+            # the left's -- its fingers then stretched across to the other
+            # hand whenever one of them moved
+            m = (lab == name) & (np.sign(P[:, 0]) == sx)
             pts = X.finger_points(sx, name)
             sw = R.segment_weights(P[m], pts, [f"f_{name}_1{s}", f"f_{name}_2{s}"], before="hand" + s, blend=0.3)
             for g in list(body.vertex_groups):
@@ -133,6 +144,8 @@ def build(coll=None, voxel=0.0028):
                 for i, wi in zip(np.nonzero(m)[0], w):
                     if wi > 1e-4:
                         vg.add([int(i)], float(wi), "REPLACE")
+    _bean_bends(body)
+    R.fill_unweighted(body)
     # antennae
     for s, a in ants.items():
         Pw = np.array([a.matrix_world @ Vector(v) for v in C.verts_np(a)])
@@ -170,15 +183,19 @@ def build(coll=None, voxel=0.0028):
     # the brows carry the face, so they travel further too
     for k in ("mouth_wide", "mouth_narrow", "smile", "frown"):
         keys[k] = keys[k] * 1.6
-    for k in [k for k in keys if k.startswith(("brow_", "cheek_"))]:
+    for k in [k for k in keys if k.startswith("cheek_")]:
         keys[k] = keys[k] * 1.5
+    keys.update(F.open_key(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, drop=0.032, sigma=0.045))
     keys["nostril_flare"] = _nostril_flare(P)
     keys["nose_scrunch"] = _nose_scrunch(P)
     F.add_keys(body, keys)
     body.data.shape_keys.key_blocks["lips_close"].value = 1.0
 
     tongue = build_tongue(coll)
-    R.attach(tongue, arm, "jaw")
+    # on the head: the mouth opens by a shape now, not by the jaw bone, and a
+    # tongue riding the jaw poked out through the chin
+    R.attach(tongue, arm, "head")
+    R.attach(tooth, arm, "head")
 
     for o in (body,):
         C.subsurf(o, 1, 2)
@@ -191,7 +208,55 @@ def build(coll=None, voxel=0.0028):
     arm["lids_rest"] = {}
     arm["tongue"] = tongue.name
     arm["face_offset"] = (0, -0.1, -0.005)
+    # at rest: a small smile, lips just parted so the tooth peeks out
+    arm["smile_base"] = 0.3
+    arm["lips_rest"] = 0.45
+    # the mouth opens by the mouth_open shape, never the jaw bone (see
+    # face.open_key); jaw degrees from the speech drive the shape instead
+    arm["open_by_key"] = True
+    arm["jaw_scale"] = 24.0
+    arm["jaw_max"] = 12.0
+    arm["lower_down_gain"] = 1.2
     return dict(rig=arm, body=body, eyes=eyes, antennae=ants, tongue=tongue, coll=coll)
+
+
+def _bean_bends(body):
+    """A bean bends through its whole body; it has no neck to hinge at.
+
+    Bone heat split head from body along a line just under the chin, so
+    every nod folded the skin there into a V. The trunk instead takes root,
+    body and head weights as wide, overlapping gradients by height, and a
+    tilt of the head spreads over twenty centimetres of belly.
+    """
+    import numpy as np
+    lab = C.labels_np(body)
+    P = C.verts_np(body)
+    limbs = {"arm", "hand", "f1", "f2", "f3", "foot"}
+
+    def ss(a, b, x):
+        t = np.clip((x - a) / (b - a), 0, 1)
+        return t * t * (3 - 2 * t)
+    z = P[:, 2]
+    w_head = ss(-0.05, 0.16, z)
+    w_root = ss(-0.04, -0.22, z)
+    w_body = np.clip(1.0 - w_head - w_root, 0, 1)
+    groups = {n: (body.vertex_groups.get(n) or body.vertex_groups.new(name=n)) for n in ("root", "body", "head")}
+    trunk = [i for i in range(len(P)) if lab[i] not in limbs]
+    for i in trunk:
+        v = body.data.vertices[i]
+        limb_w = 0.0
+        for g in list(v.groups):
+            name = body.vertex_groups[g.group].name
+            if name in ("root", "body", "head", "jaw"):
+                body.vertex_groups[g.group].remove([i])
+            else:
+                limb_w += g.weight
+        rest = max(0.0, 1.0 - limb_w)
+        for n, w in (("root", w_root[i]), ("body", w_body[i]), ("head", w_head[i])):
+            if w * rest > 1e-4:
+                groups[n].add([i], float(w * rest), "REPLACE")
+    R.normalise(body)
+    C.log(f"{body.name}: trunk of {len(trunk)} vertices bends as one (no neck)")
 
 
 def _blend_group(ob, name, w, take_from):
@@ -276,7 +341,9 @@ def tongue_rest():
     pts = []
     for i in range(TONGUE_POINTS):
         t = i / (TONGUE_POINTS - 1)
-        pts.append((mx, my + 0.075 - 0.07 * t, mz - 0.02 + 0.006 * math.sin(math.pi * t)))
+        # well inside the mouth: tucked at its front it poked out under the
+        # chin whenever the jaw moved
+        pts.append((mx, my + 0.085 - 0.05 * t, mz - 0.016 + 0.005 * math.sin(math.pi * t)))
     return pts
 
 

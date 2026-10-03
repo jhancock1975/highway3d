@@ -30,6 +30,6 @@ for spec in a.shots.split(","):
                         "--engine", a.engine], capture_output=True, text=True)
     err = [l for l in (r.stdout + r.stderr).splitlines() if "Error" in l or "Traceback" in l or "line " in l]
     for l in (r.stdout).splitlines():
-        if "chalk on the slate" in l:
+        if "chalk on the slate" in l or "clear of Euler" in l or "lick camera" in l:
             print("  ", l.strip(), flush=True)
     print(sh, fr, "ok" if r.returncode == 0 and not err else "\n".join(err[-12:]), flush=True)

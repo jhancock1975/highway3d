@@ -13,8 +13,9 @@ how it thinks:
   when it tells a blind man "neither have I", it means it
 - a wide frog's mouth, because the tongue that lives in it is long enough
   to lick a slate from across a desk
-- brows on a soft ridge where eyes would be: with no eyes, the brows, the
-  nose, the antennae and the mouth carry every expression
+- no brows either: a smooth dome of a head. The nose, the antennae, the
+  cheeks and a wide, soft, smiling mouth with one small buck tooth carry
+  every expression
 - a round bean of a body that floats, squashes and stretches, with stubby
   three-fingered arms and little feet that never quite touch anything
 
@@ -35,20 +36,20 @@ BELLY = (0.72, 0.48, 0.26)       # cream
 FRECKLE = (0.26, 0.07, 0.025)
 SWIRL = (0.30, 0.085, 0.03)
 NOSE = (0.72, 0.22, 0.26)        # a warm rosy pink
-LIP = (0.40, 0.10, 0.06)
-MOUTH = (0.22, 0.03, 0.06)
+LIP = (0.60, 0.22, 0.14)         # soft, close to the skin: a smile, not a stitch
+MOUTH = (0.48, 0.10, 0.15)       # rosy inside
 BLUSH = (0.66, 0.18, 0.12)
 BROW = (0.12, 0.03, 0.012)
 ANTENNA = (0.72, 0.42, 0.14)
 GLOW = (0.45, 0.3, 1.0)           # lavender, at the antenna tips
 
 
-MOUTH_C = (0.0, -0.163, -0.014)
-MOUTH_HALF_W = 0.066
-SMILE_LIFT = 0.012
+MOUTH_C = (0.0, -0.17, 0.004)
+MOUTH_HALF_W = 0.058
+SMILE_LIFT = 0.019
 JAW_PIVOT = (0.0, -0.02, 0.0)
 
-CHEEKS = [(0.088, -0.118, 0.05), (-0.088, -0.118, 0.05)]
+CHEEKS = [(0.078, -0.13, 0.03), (-0.078, -0.13, 0.03)]
 BROW_L = (0.058, -0.128, 0.158)
 BROW_R = (-0.058, -0.128, 0.158)
 BROW_INNER_L = (0.028, -0.134, 0.152)
@@ -63,17 +64,29 @@ def smile(P):
     o = np.zeros_like(P)
     u = np.clip((P[:, 0] - mx) / MOUTH_HALF_W, -1.3, 1.3)
     o[:, 2] = SMILE_LIFT * u * u
-    o[:, 1] = 0.02 * u * u          # the corners wrap round the face
+    o[:, 1] = 0.024 * u * u         # the corners curl back into the cheeks
     return o
 
 
 def lips():
     mx, my, mz = MOUTH_C
-    up = Warp(Ellipsoid((mx, my - 0.002, mz + 0.008), (0.07, 0.012, 0.008), color=LIP,
+    up = Warp(Ellipsoid((mx, my - 0.001, mz + 0.007), (0.06, 0.01, 0.0075), color=LIP,
                         label="lip_upper"), smile)
-    lo = Warp(Ellipsoid((mx, my - 0.001, mz - 0.009), (0.064, 0.013, 0.009), color=LIP,
+    lo = Warp(Ellipsoid((mx, my, mz - 0.0085), (0.055, 0.012, 0.0095), color=LIP,
                         label="lip_lower"), smile)
     return up, lo
+
+
+def tooth():
+    """One small rounded buck tooth under the middle of the upper lip. Cute,
+    and a little silly, which is the point."""
+    mx, my, mz = MOUTH_C
+    # tucked behind the closed lips; it shows when the mouth opens
+    return S.RoundBox((mx, my + 0.004, mz + 0.0015), (0.0085, 0.003, 0.0068), 0.0034,
+                      color=(0.94, 0.92, 0.86), label="tooth")
+
+
+TOOTH_BOUNDS = ((-0.03, -0.21, -0.03), (0.03, -0.15, 0.03))
 
 
 def body():
@@ -86,15 +99,12 @@ def body():
         Ellipsoid((0, -0.01, -0.06), (0.165, 0.15, 0.15), color=BODY, label="skin"),
         S.blend(Ellipsoid((0, -0.02, -0.17), (0.1, 0.09, 0.06), color=BODY, label="skin"), 0.06),
         # cheeks, full and blushing
-        S.blend(Ellipsoid((0.085, -0.1, 0.045), (0.05, 0.045, 0.04), color=BLUSH,
+        S.blend(Ellipsoid((0.078, -0.115, 0.03), (0.048, 0.042, 0.04), color=BLUSH,
                           label="cheek", mirror=True), 0.035),
         # a muzzle for the wide mouth
-        S.blend(Ellipsoid((0, -0.128, -0.016), (0.094, 0.052, 0.048), color=BODY, label="muzzle"), 0.04),
-        # a soft ridge where eyes would be, and the brows on it: with no
-        # eyes they carry the expression, so they are bigger and bolder
-        S.blend(Ellipsoid((0, -0.1, 0.145), (0.1, 0.035, 0.04), color=BODY, label="ridge"), 0.04),
-        S.blend(Ellipsoid((0.058, -0.139, 0.158), (0.043, 0.019, 0.015), R=rot(0, -14, 8),
-                          color=BROW, label="brows", mirror=True), 0.007),
+        # a round muzzle right under the nose for the mouth to smile on
+        S.blend(Ellipsoid((0, -0.132, 0.004), (0.085, 0.05, 0.042), color=BODY, label="muzzle"), 0.045),
+
         # the nose: the most important thing on it
         S.blend(Capsule((0, -0.122, 0.13), (0, -0.162, 0.09), 0.017, 0.028, color=NOSE, label="nose"), 0.02),
         S.blend(Sphere(NOSE_C, 0.04, color=NOSE, label="nose"), 0.015),
@@ -120,7 +130,9 @@ def body():
     b = Union(parts, k=0.03)
 
     # cream belly and face-front
-    belly = Ellipsoid((0, -0.13, -0.1), (0.11, 0.08, 0.11))
+    # the cream belly starts well below the mouth: on the colour line the
+    # mouth read as a seam
+    belly = Ellipsoid((0, -0.13, -0.17), (0.105, 0.08, 0.085))
     b = Paint(b, belly, BELLY, soft=0.02, label="belly")
     # freckles over the cheeks and nose bridge, and all down the back
     fr = lambda P: np.clip((S.value_noise(P, 0.0055, 31) - 0.7) / 0.05, 0, 1) * (
@@ -142,7 +154,9 @@ def body():
     b = Subtract(b, nost, k=0.005)
     slot = Warp(Ellipsoid((mx, my + 0.02, mz), (MOUTH_HALF_W + 0.003, 0.04, 0.0038),
                           color=MOUTH, label="mouth"), smile)
-    bag = Ellipsoid((mx, my + 0.06, mz - 0.01), (0.055, 0.045, 0.03), color=MOUTH, label="mouth")
+    # the cavity sits well back: just behind thin chest skin, its rosy inside
+    # showed through whenever that skin moved
+    bag = Ellipsoid((mx, my + 0.072, mz - 0.004), (0.05, 0.042, 0.026), color=MOUTH, label="mouth")
     b = Subtract(b, Union([slot, bag], k=0.015), k=0.0035)
     return b
 
