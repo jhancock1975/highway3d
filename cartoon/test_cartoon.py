@@ -99,6 +99,62 @@ def test_reach():
     check("every formula is within Euler's measured reach", far <= MK.CHALK_REACH, f"{far:.2f} m")
 
 
+def test_every_glyph_drawn_exists():
+    """A character its font has no glyph for renders as nothing. Moving off
+    the macOS fonts, the bakery sign's Cyrillic, the visions' pi, infinity
+    and one-ninth would all have vanished without a word. Every string the
+    film draws -- book spines, signs, the visions' labels, the cards -- must
+    be covered by the font it is drawn in."""
+    import ast
+    import urllib.error
+    try:
+        from fontTools.ttLib import TTFont
+    except ImportError:
+        check("every glyph drawn exists (needs fonttools)", False, "uv pip install fonttools")
+        return
+    import fonts
+    try:
+        cmaps = {role: set(TTFont(fonts.path(role)).getBestCmap()) for role in fonts.FONTS}
+    except (urllib.error.URLError, OSError) as e:
+        print(f"skip glyphs (fonts not fetched: {e})")
+        return
+
+    def module(path):
+        return ast.parse(open(os.path.join(HERE, path)).read())
+
+    def constants(tree):
+        """NAME = "role" assignments at module level."""
+        return {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign)
+                for t in n.targets if isinstance(t, ast.Name)
+                and isinstance(n.value, ast.Constant) and isinstance(n.value.value, str)}
+
+    drawn = []          # (where, text, role)
+    for path, call, default in (("cartoon/sets/study.py", "_text", "FONT_BOOK"),
+                                ("cartoon/sets/petersburg.py", "_text", "FONT_BOOK"),
+                                ("cartoon/bl/visions.py", "text", "FONT")):
+        tree = module(path)
+        roles = dict(constants(module("cartoon/sets/study.py")), **constants(tree))
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Call) and getattr(n.func, "id", None) == call and len(n.args) > 1:
+                kw = next((k.value.id for k in n.keywords if k.arg == "font" and isinstance(k.value, ast.Name)), default)
+                if isinstance(n.args[1], ast.Constant):
+                    drawn.append((path, n.args[1].value, roles[kw]))
+            # labels picked from literal lists (the Basel rings, the wheel's sectors, book titles)
+            if isinstance(n, (ast.List, ast.Tuple)):
+                for e in n.elts:
+                    if isinstance(e, ast.Constant) and isinstance(e.value, str) and not e.value.startswith("v."):
+                        drawn.append((path, e.value, roles[default]))
+    doc = script.load(DOC)
+    drawn.append(("title card", doc["title"], "script"))
+    for sc in doc["scenes"]:
+        for b in sc.get("beats") or []:
+            if b.get("card"):
+                drawn += [("card", b["card"], "script"), ("card", b["card"], "caslon")]
+    missing = sorted({(w, t, r, c) for w, t, r in drawn for c in t if not c.isspace() and ord(c) not in cmaps[r]})
+    check("every glyph the film draws exists in its font", not missing,
+          "; ".join(f"{t!r} in {r} ({w}) lacks {c!r}" for w, t, r, c in missing[:6]))
+
+
 def test_sculpt():
     f = sculpt.Union([sculpt.Sphere((0, 0, 0), 0.1), sculpt.Ellipsoid((0.1, 0, 0), (0.06, 0.04, 0.03))], k=0.03)
     v, q = sculpt.surface_nets(f, (-0.2, -0.2, -0.2), (0.25, 0.2, 0.2), 0.005)

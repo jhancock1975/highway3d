@@ -10,8 +10,11 @@ from __future__ import annotations
 import os
 import subprocess
 
-FONT_TITLE = "/System/Library/Fonts/Supplemental/SnellRoundhand.ttc"
-FONT_CARD = "/System/Library/Fonts/Supplemental/BigCaslon.ttf"
+import fonts
+
+# roles in fonts.py: OFL fonts fetched on first use, never committed
+FONT_TITLE = "script"
+FONT_CARD = "caslon"
 
 
 def card(text, path, size=(1920, 1080), font=FONT_CARD, pt=84, y=0.78, sub=None, sub_pt=44):
@@ -20,7 +23,7 @@ def card(text, path, size=(1920, 1080), font=FONT_CARD, pt=84, y=0.78, sub=None,
     W, H = size
     img = Image.new("RGBA", size, (0, 0, 0, 0))
     shadow = Image.new("RGBA", size, (0, 0, 0, 0))
-    f = ImageFont.truetype(font, pt)
+    f = ImageFont.truetype(fonts.path(font), pt)
     d = ImageDraw.Draw(img)
     ds = ImageDraw.Draw(shadow)
     tw = d.textlength(text, font=f)
@@ -28,7 +31,7 @@ def card(text, path, size=(1920, 1080), font=FONT_CARD, pt=84, y=0.78, sub=None,
     ds.text((x + 3, yy + 4), text, font=f, fill=(0, 0, 0, 200))
     d.text((x, yy), text, font=f, fill=(255, 248, 235, 255))
     if sub:
-        fs = ImageFont.truetype(FONT_CARD, sub_pt)
+        fs = ImageFont.truetype(fonts.path(FONT_CARD), sub_pt)
         sw = d.textlength(sub, font=fs)
         ds.text(((W - sw) / 2 + 2, yy + pt * 1.35 + 3), sub, font=fs, fill=(0, 0, 0, 200))
         d.text(((W - sw) / 2, yy + pt * 1.35), sub, font=fs, fill=(255, 240, 220, 255))

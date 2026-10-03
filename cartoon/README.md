@@ -166,10 +166,23 @@ note of 2026-09-26). The mix ducks the score under every line.
 
 | runs where | does |
 | --- | --- |
-| `cartoon/.venv` | documents, timeline, slate frames, mix, assembly, MCP |
+| `cartoon/.venv` | documents, timeline, slate frames, mix, assembly, MCP; fonttools for the tests |
 | `.ttsvenv` | Kokoro speech; MusicGen score |
 | `lectern/.manimvenv` | typesetting the slate's formulas |
 | Blender | sculpting, rigging, sets, performance, frames |
+
+## Fonts
+
+Every font is under the SIL Open Font License, fetched on first use by
+`fonts.py` at the repo's root from a pinned commit of the Google Fonts
+repository, checked against git's hash of the file, and cached in
+`.work/fonts` -- none is committed. Pinyon Script for the title and chapter
+cards, Libre Caslon Display for the place card, the book spines and the
+visions' labels, STIX Two for their mathematics, and Old Standard for the
+Petersburg signs, which needs Cyrillic. They replaced macOS system fonts
+named by path, which exist on no other system. A character a font has no
+glyph for renders as nothing, so a test checks every string the film draws
+against the font it is drawn in.
 
 ## Assets
 

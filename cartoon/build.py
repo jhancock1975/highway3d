@@ -32,6 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+import fonts  # noqa: E402
 from cartoon import assemble, chalk, script, sound, timeline  # noqa: E402
 
 TTS = os.path.join(ROOT, ".ttsvenv", "bin", "python")
@@ -151,6 +152,7 @@ def build(script_path, out, work=None, engine="BLENDER_EEVEE", samples=96, res="
     log = os.path.join(work, "build.log")
     st = Status(work)
     try:
+        fonts.fetch_all()
         st.set(step="speak")
         st.log("speaking")
         _run([TTS, "-m", "cartoon.speak", "--script", script_path, "--work", work], log, cwd=ROOT)

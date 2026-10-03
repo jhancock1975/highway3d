@@ -27,7 +27,7 @@ from cartoon import sculpt as S
 from cartoon.bl import common as C
 from cartoon.sets.study import _box, _cyl, _text, _textured, _sky_material, FONT_BOOK
 
-FONT_SIGN = "/System/Library/Fonts/Supplemental/Baskerville.ttc"
+FONT_SIGN = "sign"              # a role in fonts.py: has Cyrillic for БУЛОЧНАЯ
 
 # Euler's house: its study window is the lit one on the first floor
 HOUSE_X = 0.0

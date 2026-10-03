@@ -15,6 +15,7 @@ import functools
 import io
 import math
 import os
+import sys
 
 import matplotlib
 matplotlib.use("Agg")
@@ -33,18 +34,16 @@ GREEN = (130, 222, 160)
 RED = (255, 122, 122)
 GRID = (44, 52, 68)
 
-FONT_DIR = "/System/Library/Fonts/Supplemental"
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import fonts  # noqa: E402  (OFL fonts fetched on first use, never committed)
 
 
 @functools.lru_cache(maxsize=32)
 def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    name = "Georgia Bold.ttf" if bold else "Georgia.ttf"
-    try:
-        return ImageFont.truetype(os.path.join(FONT_DIR, name), size)
-    except OSError:
-        return ImageFont.truetype(
-            os.path.join(FONT_DIR, "Arial Bold.ttf" if bold else "Arial.ttf"),
-            size)
+    f = ImageFont.truetype(fonts.path("serif"), size)
+    if bold:
+        f.set_variation_by_axes([700])
+    return f
 
 
 @functools.lru_cache(maxsize=256)

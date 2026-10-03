@@ -25,13 +25,14 @@ import bpy
 import numpy as np
 from mathutils import Euler, Matrix, Vector
 
+import fonts
 from cartoon import assets
 from cartoon.bl import common as C
 from cartoon.sets import marks as MK
 
 W, D, H = 6.0, MK.ROOM_D, 3.3    # room: x from -3 to 3, y from -3 to 3
 WIN_X, WIN_W, WIN_SILL, WIN_H = MK.WIN_X, MK.WIN_W, MK.WIN_SILL, MK.WIN_H
-FONT_BOOK = "/System/Library/Fonts/Supplemental/BigCaslon.ttf"
+FONT_BOOK = "caslon"            # a role in fonts.py
 
 # Euler's own books, and what an eighteenth-century mathematician read.
 TITLES = [
@@ -85,8 +86,8 @@ def _text(name, body, loc, rot, size, mat, coll, font=FONT_BOOK, extrude=0.0006,
     cu.extrude = extrude
     cu.align_x = align
     cu.align_y = "CENTER"
-    if font and os.path.exists(font):
-        cu.font = bpy.data.fonts.load(font, check_existing=True)
+    if font:
+        cu.font = bpy.data.fonts.load(fonts.path(font), check_existing=True)
     ob = bpy.data.objects.new(name, cu)
     ob.location = loc
     ob.rotation_euler = rot

@@ -18,10 +18,12 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
+import fonts
 from cartoon.bl import common as C, eyes as E
 
-FONT = "/System/Library/Fonts/Supplemental/BigCaslon.ttf"
-MATH_FONT = "/System/Library/Fonts/Supplemental/Times New Roman Italic.ttf"
+# roles in fonts.py: OFL fonts fetched on first use, never committed
+FONT = "caslon"
+MATH_FONT = "italic"
 CENTER = Vector((0.0, 0.0, 1.2))
 
 
@@ -64,7 +66,7 @@ def text(name, body, loc, size, mat, font=FONT, rot=(math.radians(90), 0, 0)):
     cu.align_x = "CENTER"
     cu.align_y = "CENTER"
     cu.extrude = 0.004
-    cu.font = bpy.data.fonts.load(font, check_existing=True)
+    cu.font = bpy.data.fonts.load(fonts.path(font), check_existing=True)
     ob = bpy.data.objects.new(name, cu)
     ob.location = loc
     ob.rotation_euler = rot
@@ -213,7 +215,9 @@ def basel(f0, f1, fps):
                   lambda f, f_on=f_on: 0.0 if f < f_on else (1.3 if f < f_on + 6 else 1.0))
         rings.append(ring)
         if k <= 4:
-            lab = ["1", "¼", "⅑", "1/16"][k - 1]
+            # slashed, all four: no font here has a one-ninth glyph, and a
+            # missing glyph renders as nothing
+            lab = ["1", "1/4", "1/9", "1/16"][k - 1]
             tx = text(f"v.basel_lab{k}", lab, CENTER + Vector((R * 0.72, 0.38, R * 0.72)), 0.12,
                       glow("v.lab", (1, 0.9, 0.7), 4.0), font=FONT)
             key_scale(tx, [f0, f_on, f_on + 8, f_on + 30, f_on + 40],
@@ -248,8 +252,9 @@ def harmonic(f0, f1, fps):
     tx = text("v.harm_sum", "1 + ½ + ⅓ + ¼ + …", CENTER + Vector((0, -0.2, -0.75)), 0.13,
               glow("v.hsum", (1, 0.85, 0.6), 4.0))
     key_scale(tx, [f0, f0 + 6, f1], lambda f: 0.0 if f < f0 + 6 else 1.0)
+    # upright, as infinity always is in mathematics (and the italic has none)
     inf = text("v.harm_inf", "∞", CENTER + Vector((0.95, -0.1, 0.75)), 0.35, glow("v.inf", (1, 0.25, 0.1), 9.0),
-               font=MATH_FONT)
+               font=FONT)
     f_inf = f1 - int(1.3 * fps)
     key_scale(inf, [f0, f_inf, f_inf + 6, f1], lambda f: 0.0 if f < f_inf else (1.4 if f < f_inf + 6 else 1.0))
     # sparks
