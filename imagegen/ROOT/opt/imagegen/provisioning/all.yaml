@@ -1,0 +1,25 @@
+# Both model sets: kroma.yaml and chroma.yaml together (62.69 GB). Also baked in as
+# /provisioning.yaml. See those two files for what each download is and why some are
+# renamed. CI checks that this file is exactly their union.
+version: 1
+
+extensions:
+  - module: provisioner_comfyui
+    config:
+      comfyui_dir: "${WORKSPACE:-/workspace}/ComfyUI"
+
+downloads:
+  # Kroma v0.3 turbo set (34.77 GB)
+  - url: https://huggingface.co/lodestones/Kroma/resolve/b921d45c0f2c33ab753a32e32a5fe34eb790344c/kroma-v0.3-turbo.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/diffusion_models/kroma-v0.3-turbo.safetensors"
+  - url: https://huggingface.co/Comfy-Org/Krea-2/resolve/eb1eddd3983a54678545a9b2c178c5853b30f7be/text_encoders/qwen3vl_4b_bf16.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/text_encoders/qwen3vl_4b.safetensors"
+  - url: https://huggingface.co/Comfy-Org/Krea-2/resolve/eb1eddd3983a54678545a9b2c178c5853b30f7be/vae/qwen_image_vae.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/vae/QwenImage/qwen_image_vae.safetensors"
+  # Chroma1-HD set (27.92 GB)
+  - url: https://huggingface.co/lodestones/Chroma1-HD/resolve/0e0c60ece1e82b17cb7f77342d765ba5024c40c0/Chroma1-HD.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/diffusion_models/Chroma1-HD.safetensors"
+  - url: https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5/t5xxl_fp16.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/text_encoders/t5xxl_enconly.safetensors"
+  - url: https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/5b072540ef86570fecb8249c505f23d5bdeb88cd/split_files/vae/ae.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/vae/Flux/ae.safetensors"

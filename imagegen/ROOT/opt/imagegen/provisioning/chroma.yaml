@@ -1,0 +1,28 @@
+# Chroma1-HD by lodestones (8.9B, FLUX.1-schnell based, Apache-2.0), plus the T5-XXL text
+# encoder and the FLUX VAE. 27.92 GB in all. Every URL is pinned to a repo commit and
+# downloads without a Hugging Face token.
+#
+# Two files are saved under the names SwarmUI looks for, so it uses them instead of
+# fetching its own copies the first time someone generates:
+#   text_encoders/t5xxl_enconly.safetensors   SwarmUI's name for the T5-XXL encoder;
+#                                             this is the fp16 encoder-only build
+#   vae/Flux/ae.safetensors                   SwarmUI's default VAE path for Flux/Chroma
+#                                             (byte-identical to the one SwarmUI would fetch)
+# In raw ComfyUI, load the text encoder with CLIPLoader type "chroma".
+version: 1
+
+extensions:
+  - module: provisioner_comfyui
+    config:
+      comfyui_dir: "${WORKSPACE:-/workspace}/ComfyUI"
+
+downloads:
+  # 17.80 GB, bf16
+  - url: https://huggingface.co/lodestones/Chroma1-HD/resolve/0e0c60ece1e82b17cb7f77342d765ba5024c40c0/Chroma1-HD.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/diffusion_models/Chroma1-HD.safetensors"
+  # 9.79 GB, fp16
+  - url: https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/6af2a98e3f615bdfa612fbd85da93d1ed5f69ef5/t5xxl_fp16.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/text_encoders/t5xxl_enconly.safetensors"
+  # 0.34 GB (the FLUX.1 autoencoder, as repackaged by Comfy-Org)
+  - url: https://huggingface.co/Comfy-Org/Lumina_Image_2.0_Repackaged/resolve/5b072540ef86570fecb8249c505f23d5bdeb88cd/split_files/vae/ae.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/vae/Flux/ae.safetensors"

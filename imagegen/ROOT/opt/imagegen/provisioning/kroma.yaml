@@ -1,0 +1,28 @@
+# Kroma v0.3 turbo, a full fine-tune of Krea 2 by lodestones, plus the Krea 2 text encoder
+# and VAE. 34.77 GB in all. Every URL is pinned to a repo commit and downloads without a
+# Hugging Face token.
+#
+# Two files are saved under the names SwarmUI looks for, so it uses them instead of
+# fetching its own (smaller, fp8) copies the first time someone generates:
+#   text_encoders/qwen3vl_4b.safetensors       SwarmUI's name for the Krea 2 text encoder;
+#                                              this is the bf16 build (Qwen3-VL 4B)
+#   vae/QwenImage/qwen_image_vae.safetensors   SwarmUI's default VAE path for Krea 2
+#                                              (byte-identical to the one SwarmUI would fetch)
+# In raw ComfyUI, load the text encoder with CLIPLoader type "krea2".
+version: 1
+
+extensions:
+  - module: provisioner_comfyui
+    config:
+      comfyui_dir: "${WORKSPACE:-/workspace}/ComfyUI"
+
+downloads:
+  # 25.64 GB, bf16
+  - url: https://huggingface.co/lodestones/Kroma/resolve/b921d45c0f2c33ab753a32e32a5fe34eb790344c/kroma-v0.3-turbo.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/diffusion_models/kroma-v0.3-turbo.safetensors"
+  # 8.88 GB, bf16 (Comfy-Org's ungated repackage; the official Krea repo is gated)
+  - url: https://huggingface.co/Comfy-Org/Krea-2/resolve/eb1eddd3983a54678545a9b2c178c5853b30f7be/text_encoders/qwen3vl_4b_bf16.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/text_encoders/qwen3vl_4b.safetensors"
+  # 0.25 GB
+  - url: https://huggingface.co/Comfy-Org/Krea-2/resolve/eb1eddd3983a54678545a9b2c178c5853b30f7be/vae/qwen_image_vae.safetensors
+    dest: "${WORKSPACE:-/workspace}/ComfyUI/models/vae/QwenImage/qwen_image_vae.safetensors"
