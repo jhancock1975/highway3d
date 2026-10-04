@@ -1,0 +1,5 @@
+# studio-vast: image identity (overrides the ComfyUI derivative's block)
+image:
+  name: Studio (uncensored director LLM, Chroma1-HD, Wan2.2-Remix, Kokoro, ACE-Step, Blender)
+  readme: https://github.com/jhancock1975/highway3d/tree/studio-vast/studio-vast
+  preinstalled: PyTorch + ComfyUI + vLLM + Open WebUI + Blender 5.2 + GIMP 3.2 + Manim/LaTeX + Kokoro + ACE-Step
