@@ -121,6 +121,11 @@ for set in all none; do
 done
 inside "studio folders laid out, renders linked into the repo" \
     '. /opt/studio-vast/bin/studio-env.sh && test -d "$STUDIO_MEDIA" && test -d "$STUDIO_WORK" && test -s "$STUDIO_WEBUI/secret" && test "$(readlink /opt/highway3d/renders)" = "$STUDIO_RENDERS"'
+inside "gpu-plan.py shared out the GPUs at boot (none on CI)" 'grep -qx "STUDIO_GPU_COUNT=0" /etc/studio-gpus.env'
+inside "gpu-plan.py's tests" 'python3 /ci/test_gpu_plan.py'
+inside "studio-fetch.py's tests (a stalled download is restarted)" 'python3 /ci/test_studio_fetch.py'
+inside "studio-fetch.py finds a working hf" \
+    'h=$(/usr/bin/python3 -c "import runpy; print(runpy.run_path(\"/opt/studio-vast/bin/studio-fetch.py\")[\"hf_command\"]())") && echo "$h" && "$h" download --help >/dev/null'
 
 section "ComfyUI (127.0.0.1:18188)"
 wait_until 600 "ComfyUI answers /system_stats" icurl -f http://127.0.0.1:18188/system_stats
@@ -251,6 +256,8 @@ for prog in comfyui openwebui caddy instance_portal studio-mcp-studio studio-mcp
 done
 grep -qE "^vllm[[:space:]]+EXITED" "$OUT/supervisor.txt" && docker exec "$NAME" grep -q "vLLM not started" /var/log/portal/vllm.log \
     && pass "vllm exited cleanly with no model to serve" || fail "vllm did not exit cleanly without a model"
+grep -qE "^studio-models[[:space:]]+EXITED" "$OUT/supervisor.txt" && docker exec "$NAME" grep -q "no studio model downloads" /var/log/portal/studio-models.log \
+    && pass "studio-models downloaded nothing with STUDIO_MODELS=none" || fail "studio-models did not stand down with STUDIO_MODELS=none"
 
 if (( FAILURES > 0 )); then
     diagnostics

@@ -16,7 +16,15 @@ if [[ -z "${PROVISIONING_MANIFEST:-}" ]]; then
     echo "Studio model set '${_studio_set}': provisioning from ${PROVISIONING_MANIFEST}"
     unset _studio_set
 fi
+# Share out the GPUs (gpu-plan.py) for every studio program, through studio-env.sh. ComfyUI is
+# started by vast's own script, which reads /etc/environment, so its GPU goes there.
+/usr/bin/python3 /opt/studio-vast/bin/gpu-plan.py > /etc/studio-gpus.env 2>/dev/null || echo "STUDIO_GPU_COUNT=0" > /etc/studio-gpus.env
 . /opt/studio-vast/bin/studio-env.sh
+if [[ -n "${COMFYUI_CUDA_DEVICE:-}" && "${COMFYUI_ARGS:-}" != *--cuda-device* ]]; then
+    sed -i '/^COMFYUI_ARGS=/d' /etc/environment
+    echo "COMFYUI_ARGS=\"${COMFYUI_ARGS:-} --cuda-device ${COMFYUI_CUDA_DEVICE}\"" >> /etc/environment
+fi
+echo "Studio GPUs: $(tr '\n' ' ' < /etc/studio-gpus.env)"
 mkdir -p "$STUDIO_MEDIA" "$STUDIO_RENDERS" "$STUDIO_WORK" "$DATA_DIR" "$ACE_HOME/checkpoints" \
          "$(dirname "$STUDIO_LLM_DIR")"
 # cartoon writes its films to renders/ in the repo

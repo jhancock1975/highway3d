@@ -4,8 +4,8 @@
 #   music     ACE-Step 1.5 checkpoints (9.4 GB)
 #   voices    Kokoro-82M (0.3 GB), into the Hugging Face cache Kokoro reads
 #   director  Qwen3.8-27B abliterated, BF16 (55.6 GB; vLLM quantises it to FP8 as it loads)
-# Repos are fetched with `hf download --revision` in post_commands, because the provisioner
-# cannot pin a whole repo. Plain paths only: ${...} would be expanded when the manifest loads.
+# Whole repos are fetched with `hf download --revision`, because the provisioner cannot pin one:
+# Kokoro in post_commands here, the director and ACE-Step in supervisor-scripts/studio-models.sh. Plain paths only: ${...} would be expanded when the manifest loads.
 version: 1
 settings:
   concurrency: {hf_downloads: 4, wget_downloads: 4}
@@ -28,7 +28,6 @@ downloads:
     dest: "${WORKSPACE:-/workspace}/ComfyUI/models/text_encoders/nsfw_wan_umt5-xxl_fp8_scaled.safetensors"
   - url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/ee6f4a40737a995bf5818954cfce6d59443b0f04/split_files/vae/wan_2.1_vae.safetensors
     dest: "${WORKSPACE:-/workspace}/ComfyUI/models/vae/wan_2.1_vae.safetensors"
+# The director and ACE-Step download in studio-models (supervisor), beside these, director first.
 post_commands:
   - hf download hexgrad/Kokoro-82M --revision f3ff3571791e39611d31c381e3a41a3af07b4987
-  - hf download ACE-Step/Ace-Step1.5 --revision 19671f406d603126926c1b7e2adc169acbcade22 --local-dir /workspace/models/ace-step/checkpoints
-  - hf download huihui-ai/Huihui-Qwen3.8-27B-abliterated --revision 739e3c5b89849f6c238ce1e5b70008612ae42cdd --local-dir /workspace/models/llm/qwen3.8-27b-abliterated && touch /workspace/models/llm/qwen3.8-27b-abliterated/.complete

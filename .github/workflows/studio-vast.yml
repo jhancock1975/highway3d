@@ -54,6 +54,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   image:
+    needs: model-urls
     name: Build, push and smoke-test the image
     runs-on: ubuntu-latest
     timeout-minutes: 300
@@ -147,6 +148,8 @@ jobs:
           if-no-files-found: ignore
 
       - name: Point :latest at the tested image
+        # Only from main: a branch's build gets its :<sha> tag, and vast-studio.sh launches :latest.
+        if: github.ref == 'refs/heads/main'
         run: |
           docker buildx imagetools create --tag "$IMAGE:latest" "$IMAGE:${{ steps.tags.outputs.short_sha }}"
           {

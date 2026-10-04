@@ -11,6 +11,8 @@ utils=/opt/supervisor-scripts/utils
 . /opt/studio-vast/bin/studio-env.sh
 cd "$STUDIO_ROOT"
 PY=/opt/venvs/tools/bin/python
+# With two or more GPUs, the jobs these servers start (ACE-Step, Blender) stay off vLLM's.
+[ "${STUDIO_GPU_COUNT:-1}" -ge 2 ] 2>/dev/null && export CUDA_VISIBLE_DEVICES="$STUDIO_WORK_GPUS"
 # exec, not pty: pty turned a crash into a clean exit.
 case "$server" in
     studio)    exec "$PY" -m studio.mcp_server --host 127.0.0.1 --port 8768 ;;

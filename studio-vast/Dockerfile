@@ -148,7 +148,9 @@ RUN set -euo pipefail && cd /opt/highway3d && \
 
 RUN set -euo pipefail && \
     chmod +x /opt/supervisor-scripts/vllm.sh /opt/supervisor-scripts/openwebui.sh \
-             /opt/supervisor-scripts/studio-mcp.sh /opt/studio-vast/bin/owui-setup.py && \
+             /opt/supervisor-scripts/studio-mcp.sh /opt/supervisor-scripts/studio-models.sh \
+             /opt/studio-vast/bin/owui-setup.py /opt/studio-vast/bin/studio-fetch.py \
+             /opt/studio-vast/bin/gpu-plan.py && \
     cp /opt/studio-vast/provisioning/all.yaml /provisioning.yaml
 
 # Instance Portal entries. External port != internal port, so Caddy fronts each app with TLS and
@@ -161,6 +163,9 @@ ENV PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8081:18081:/
 # ComfyUI hands its models back to RAM after every prompt. Kept on the GPU, Wan's 44 GB beside
 # vLLM's 42 left ACE-Step 7 GB and it died loading; reloading from RAM costs a second or two.
 ENV COMFYUI_ARGS="--disable-auto-launch --enable-cors-header --port 18188 --disable-smart-memory"
+
+# Hugging Face's Xet downloads with more connections at once.
+ENV HF_XET_HIGH_PERFORMANCE=1
 
 EXPOSE 1111 8081 8188 8080
 

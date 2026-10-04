@@ -20,3 +20,9 @@ export STUDIO_OWUI_DIR=/opt/studio-vast/owui
 export LECTERN_LLM_URL=http://127.0.0.1:18000/v1
 export LECTERN_LLM_MODEL=studio-llm
 export LECTERN_LLM_KEY=local
+# How the GPUs are shared out, written at boot by gpu-plan.py (71-studio.sh).
+if [ -r /etc/studio-gpus.env ]; then
+    set -a
+    . /etc/studio-gpus.env
+    set +a
+fi
