@@ -90,7 +90,12 @@ COPY studio-vast/ROOT/ /
 #  - one shared venv for the MCP servers and the plain tools, linked under each tool's name;
 #  - .ttsvenv (Kokoro) and lectern/.musicvenv (ACE-Step) on top of /venv/main's CUDA torch,
 #    which is pinned so nothing replaces it. The pin (torch==2.10.0+cu128) only resolves with
-#    PyTorch's own index in reach; PyPI has no +cu128 builds. ACE-Step is installed from a checkout because its
+#    PyTorch's own index in reach; PyPI has no +cu128 builds. transformers and huggingface_hub
+#    are pinned to the Mac's working Kokoro venv: left free, huggingface_hub 2.x drags
+#    transformers back to 4.12, whose tokenizers needs Rust to build. torchcodec must match
+#    torch's release (0.10 for 2.10).
+#  - lectern/.manimvenv: manimpango has no Linux wheel for Python 3.12 and builds from source
+#    against the pango/cairo headers installed above. ACE-Step is installed from a checkout because its
 #    nano-vllm dependency is a folder inside its own repo;
 #  - lectern/.manimvenv for Manim.
 RUN set -euo pipefail && cd /opt/highway3d && \
@@ -104,7 +109,7 @@ RUN set -euo pipefail && cd /opt/highway3d && \
     uv venv --python /venv/main/bin/python --system-site-packages .ttsvenv && \
     VIRTUAL_ENV=/opt/highway3d/.ttsvenv uv pip install --no-cache -c /tmp/torch-pins.txt \
         --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match \
-        "kokoro==0.9.4" "misaki[en]==0.9.4" soundfile pyyaml \
+        "kokoro==0.9.4" "misaki[en]==0.9.4" "transformers==5.17.0" "huggingface_hub==1.32.0" soundfile pyyaml \
         "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" && \
     .ttsvenv/bin/python -c "import kokoro, spacy, torch; spacy.load('en_core_web_sm'); print('TTS_OK', torch.__version__)" && \
     git clone --quiet https://github.com/ACE-Step/ACE-Step-1.5 /opt/ace-step && \
@@ -112,10 +117,10 @@ RUN set -euo pipefail && cd /opt/highway3d && \
     uv venv --python /venv/main/bin/python --system-site-packages lectern/.musicvenv && \
     VIRTUAL_ENV=/opt/highway3d/lectern/.musicvenv uv pip install --no-cache -c /tmp/torch-pins.txt \
         --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match \
-        /opt/ace-step/acestep/third_parts/nano-vllm /opt/ace-step soundfile && \
+        /opt/ace-step/acestep/third_parts/nano-vllm /opt/ace-step "torchcodec==0.10.0" soundfile && \
     lectern/.musicvenv/bin/python -c "import acestep.handler, acestep.inference, acestep.llm_inference, torch; print('ACE_OK', torch.__version__)" && \
     uv venv --python /usr/bin/python3.12 lectern/.manimvenv && \
-    VIRTUAL_ENV=/opt/highway3d/lectern/.manimvenv uv pip install --no-cache "manim==0.21.0" numpy pillow scipy pyyaml && \
+    VIRTUAL_ENV=/opt/highway3d/lectern/.manimvenv uv pip install --no-cache "manim==0.21.0" "manimpango==0.6.1" numpy pillow scipy pyyaml && \
     lectern/.manimvenv/bin/python -c "import manim; print('MANIM_OK', manim.__version__)" && \
     rm -f /tmp/torch-pins.txt
 
