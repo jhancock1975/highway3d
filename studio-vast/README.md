@@ -54,8 +54,8 @@ first boot takes a while; a restart of the same instance keeps them.
 What's legal: every one of these licences, and the law, forbids sexual content involving
 minors and non-consensual sexual imagery of real people. The director's instructions
 (`ROOT/opt/studio-vast/owui/director.md`) say so too: every character is an adult and is
-shown as one, and no real, identifiable person is depicted in a sexual, nude or degrading
-scene. Beyond that the director does not refuse adult subject matter.
+shown as one, and no real, identifiable person is depicted at all, sexual or not: every
+character is invented. Beyond that the director does not refuse adult subject matter.
 
 ## The GPU and its memory
 

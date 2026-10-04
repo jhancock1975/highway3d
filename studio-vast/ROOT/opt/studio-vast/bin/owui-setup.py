@@ -6,7 +6,8 @@ Idempotent:
 - points the tool servers at the four MCP servers;
 - creates or updates the Studio Director model (the director prompt plus
   every tool, on top of the LLM vLLM serves);
-- makes it the default for new chats.
+- makes it the default for new chats;
+- shows a banner until the director's model answers, then takes it down.
 
 Open WebUI keeps its settings in its database after the first boot, so this
 writes them through the API rather than relying on environment variables.
@@ -23,6 +24,11 @@ BASE = os.environ.get("OWUI_URL", "http://127.0.0.1:18081")
 HERE = os.environ.get("STUDIO_OWUI_DIR", "/opt/studio-vast/owui")
 LLM = os.environ.get("STUDIO_LLM_NAME", "studio-llm")
 DIRECTOR = "studio-director"
+LLM_URL = os.environ.get("STUDIO_LLM_URL", "http://127.0.0.1:18000/v1/models")
+BANNER_ID = "studio-llm-waiting"
+BANNER = ("The director's model isn't up yet. On a first boot it is still downloading (about 125 GB) and then "
+          "loading, 15 to 30 minutes in all, and a chat before then gets a connection error. If this stays, "
+          "see /var/log/portal/provisioning.log and /var/log/portal/vllm.log.")
 # Added to every MCP port; tests on a machine already running these servers use 10000.
 PORT_OFFSET = int(os.environ.get("STUDIO_MCP_PORT_OFFSET", "0"))
 MCP = [("studio", "Studio", 8768, "Keyframes, animation, voices, music, cards and the edit"),
@@ -65,6 +71,39 @@ def upsert(get_path, create_path, update_path, body, token):
     return reply
 
 
+def llm_up():
+    try:
+        with urllib.request.urlopen(LLM_URL, timeout=5) as r:
+            return r.status == 200
+    except OSError:
+        return False
+
+
+def show_banner(token, shown):
+    """Put the waiting banner up or take it down, leaving any other banner as it is."""
+    status, banners = call("GET", "/api/v1/configs/banners", token=token)
+    banners = banners if status == 200 and banners else []
+    others = [b for b in banners if b.get("id") != BANNER_ID]
+    wanted = others + ([{"id": BANNER_ID, "type": "warning", "title": "", "content": BANNER,
+                         "dismissible": False, "timestamp": int(time.time())}] if shown else [])
+    if [b.get("id") for b in wanted] == [b.get("id") for b in banners]:
+        return
+    status, _ = call("POST", "/api/v1/configs/banners", {"banners": wanted}, token=token)
+    if status != 200:
+        raise RuntimeError(f"banners: HTTP {status}")
+
+
+def wait_for_llm(token, poll=float(os.environ.get("STUDIO_LLM_POLL", "30")), up=llm_up, sleep=time.sleep):
+    """Open WebUI lists the director before its model exists; say so in a banner until it answers."""
+    if up():
+        show_banner(token, False)
+        return
+    show_banner(token, True)
+    while not up():
+        sleep(poll)
+    show_banner(token, False)
+
+
 def main():
     wait_for_owui()
     token = call("POST", "/api/v1/auths/signin", {"email": "", "password": ""})[1]["token"]
@@ -103,6 +142,8 @@ def main():
     if status != 200:
         raise RuntimeError(f"chat settings: HTTP {status}")
     print("studio: Open WebUI configured (studio_ui, four MCP servers, studio-director as the default)", flush=True)
+    wait_for_llm(token)
+    print("studio: the director's model answers", flush=True)
 
 
 if __name__ == "__main__":

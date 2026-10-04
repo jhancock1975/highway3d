@@ -16,3 +16,11 @@ def last_line(text: str) -> str:
         if line and not any(n in line for n in NOISE):
             return line
     return "it gave no reason"
+
+
+def failed(e: BaseException) -> str:
+    """A job's FAILED line for `e`. It starts a line of its own, since a progress bar may have
+    left the last one unfinished, and it is one line, so a reason spread over several (a loader's
+    error, then the file it was reading) reaches the person whole."""
+    msg = e.args[0] if isinstance(e, KeyError) and e.args else str(e)
+    return "\nFAILED " + (" ".join(str(msg).split()) or type(e).__name__)

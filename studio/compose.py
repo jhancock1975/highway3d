@@ -23,6 +23,9 @@ import tempfile
 import time
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if HERE not in sys.path:            # also run as a plain script, studio/compose.py
+    sys.path.insert(0, HERE)
+from studio import errors, gpu  # noqa: E402
 PYTHON = os.path.join(HERE, "lectern", ".musicvenv", "bin", "python")
 ACE_HOME = os.environ.get("ACE_HOME", os.path.expanduser("~/.cache/ace-step"))
 DIT = os.environ.get("ACE_DIT", "acestep-v15-turbo")
@@ -69,6 +72,13 @@ def compose(description: str, seconds: float, lyrics: str = "", seed: int = -1,
     p = params(description, seconds, lyrics, seed)
     folder = folder or tempfile.mkdtemp(prefix="studio-music-")
     dev = device(torch)
+    with gpu.hold(on_wait=progress):
+        return _compose(p, dev, folder, torch, sf, AceStepHandler, LLMHandler, GenerationConfig,
+                        GenerationParams, generate_music)
+
+
+def _compose(p, dev, folder, torch, sf, AceStepHandler, LLMHandler, GenerationConfig,
+             GenerationParams, generate_music) -> tuple[str, dict]:
     progress(f"loading ACE-Step on the {dev.upper()}")
     dit = AceStepHandler()
     msg, ok = dit.initialize_service(project_root=ACE_HOME, config_path=DIT, device=dev)
@@ -112,11 +122,11 @@ def main() -> None:
         note = library.add(path, "music", source=f"ace-step 1.5 ({DIT})", move=True,
                            description=p["caption"], lyrics=p["lyrics"], seed=p["seed"])
     except Exception as e:
-        print("FAILED " + (str(e).strip() or type(e).__name__), flush=True)
+        print(errors.failed(e), flush=True)
         sys.exit(1)
     finally:
         shutil.rmtree(folder, ignore_errors=True)
-    print("DONE " + json.dumps(dict(out=note["path"], seconds=note["seconds"],
+    print("\nDONE " + json.dumps(dict(out=note["path"], seconds=note["seconds"],
                                     bytes=os.path.getsize(note["path"]),
                                     took=time.time() - began, asset=note["id"])), flush=True)
 

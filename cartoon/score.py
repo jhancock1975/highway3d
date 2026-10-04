@@ -101,7 +101,7 @@ def cue_times(film):
     return out
 
 
-ACE_HOME = os.path.expanduser("~/.cache/ace-step")
+ACE_HOME = os.environ.get("ACE_HOME", os.path.expanduser("~/.cache/ace-step"))
 DIT = os.environ.get("ACE_DIT", "acestep-v15-turbo")
 LM = "acestep-5Hz-lm-1.7B"
 TURBO = "turbo" in DIT       # distilled: 8 steps, guidance baked in, timesteps shifted

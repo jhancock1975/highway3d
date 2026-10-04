@@ -11,10 +11,11 @@ utils=/opt/supervisor-scripts/utils
 . /opt/studio-vast/bin/studio-env.sh
 cd "$STUDIO_ROOT"
 PY=/opt/venvs/tools/bin/python
+# exec, not pty: pty turned a crash into a clean exit.
 case "$server" in
-    studio)    pty "$PY" -m studio.mcp_server --host 127.0.0.1 --port 8768 ;;
-    cartoon)   pty "$PY" -m cartoon.mcp_server --host 127.0.0.1 --port 8769 ;;
-    lectern)   pty "$PY" -m lectern.mcp_server --host 127.0.0.1 --port 8767 ;;
-    highway3d) pty "$PY" highway3d/mcp_server.py --host 127.0.0.1 --port 8766 ;;
+    studio)    exec "$PY" -m studio.mcp_server --host 127.0.0.1 --port 8768 ;;
+    cartoon)   exec "$PY" -m cartoon.mcp_server --host 127.0.0.1 --port 8769 ;;
+    lectern)   exec "$PY" -m lectern.mcp_server --host 127.0.0.1 --port 8767 ;;
+    highway3d) exec "$PY" highway3d/mcp_server.py --host 127.0.0.1 --port 8766 ;;
     *) echo "studio-mcp.sh: unknown server '$server'"; exit 2 ;;
 esac

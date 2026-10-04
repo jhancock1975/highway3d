@@ -268,7 +268,8 @@ def studio_extend(
     clip: Annotated[str, Field(description="The clip's id, such as clip-9c01.")],
     prompt: Annotated[str, Field(description="What happens next: the action, then the camera.")],
     seconds: Annotated[int, Field(ge=1, le=5, description="How much to add, 1 to 5 seconds.")] = 5,
-    quality: Annotated[Literal["draft", "final"], Field(description="draft is 480p; final is 720p.")] = "draft",
+    quality: Annotated[Literal["match", "draft", "final"],
+                       Field(description="match keeps the clip's own quality; draft is 480p; final is 720p.")] = "match",
     seed: Annotated[int, Field(description="-1 for a new random take.")] = -1,
 ) -> str:
     """Carry a clip on: animate its last frame for up to 5 more seconds and join the two into one longer clip, filed as a new clip- id (the original stays). Repeat to build long shots. Starts a job and returns at once; follow it with watch_job."""
@@ -276,9 +277,10 @@ def studio_extend(
     if refused:
         return refused
     job = jobs.new()
-    jobs.start(job, "studio.motion", ["extend", "--clip", clip.strip(), "--prompt", prompt,
-                                      "--seconds", str(seconds), "--quality", quality, "--seed", str(seed)],
-               dict(name=f"extend {clip.strip()}"))
+    args = ["extend", "--clip", clip.strip(), "--prompt", prompt, "--seconds", str(seconds), "--seed", str(seed)]
+    if quality != "match":
+        args += ["--quality", quality]
+    jobs.start(job, "studio.motion", args, dict(name=f"extend {clip.strip()}"))
     return (f"Started extending {clip.strip()} by {seconds} seconds as job {job}. "
             f"Call watch_job with {job} to show its progress and the longer clip.")
 

@@ -5,6 +5,8 @@
 import os
 import sys
 import tempfile
+import threading
+import time
 import types
 
 import numpy as np
@@ -12,7 +14,8 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 os.environ["STUDIO_MEDIA"] = tempfile.mkdtemp(prefix="studio-media-")
-from studio import compose  # noqa: E402
+os.environ["STUDIO_GPU_LOCK"] = os.path.join(tempfile.mkdtemp(prefix="studio-gpu-"), "gpu.lock")
+from studio import compose, gpu  # noqa: E402
 
 CALLS = {}
 
@@ -103,6 +106,25 @@ def test_empty_description_is_refused():
         assert "description" in str(e)
     else:
         raise AssertionError("empty description accepted")
+
+
+
+def test_ace_step_waits_while_another_job_has_the_gpu():
+    import contextlib
+    import io
+    fake_modules(cuda=True)
+    CALLS.pop("dit", None)
+    out, done = io.StringIO(), []
+    with contextlib.redirect_stdout(out):
+        with gpu.hold():
+            t = threading.Thread(target=lambda: done.append(
+                compose.compose("rain", 10, seed=1, folder=tempfile.mkdtemp())))
+            t.start()
+            time.sleep(0.5)
+            assert "dit" not in CALLS, "ACE-Step loaded while another job had the GPU"
+        t.join(30)
+    assert done and "dit" in CALLS, CALLS
+    assert "waiting for the GPU: another job is using it" in out.getvalue(), out.getvalue()
 
 
 def main():

@@ -42,8 +42,8 @@ def _summary(reply: dict) -> str:
 def _failure(status: dict) -> str:
     for kind, data in status.get("messages", []):
         if kind == "execution_error":
-            return (f"{data.get('node_type', 'a node')} failed: "
-                    f"{str(data.get('exception_message', '')).strip()}")
+            why = " ".join(str(data.get("exception_message", "")).split())   # one line, file path and all
+            return f"{data.get('node_type', 'a node')} failed: {why}"
         if kind == "execution_interrupted":
             return "ComfyUI interrupted it"
     return "ComfyUI reported an error without saying why"
@@ -128,6 +128,11 @@ class Comfy:
     def history(self, prompt_id: str):
         """The finished record of a prompt, or None while it is queued or running."""
         return self._json(f"/history/{prompt_id}").get(prompt_id)
+
+    def pending(self) -> int:
+        """How many prompts ComfyUI has running or waiting."""
+        q = self._json("/queue", timeout=10)
+        return len(q.get("queue_running", [])) + len(q.get("queue_pending", []))
 
     def ahead(self, prompt_id: str):
         """How many prompts ComfyUI will run before this one; 0 once it is running; None if unknown."""

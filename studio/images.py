@@ -109,6 +109,12 @@ def paint(prompt: str, aspect: str = "16:9", count: int = 1, negative: str = "",
     width, height = workflows.CHROMA_SIZES.get(aspect, workflows.CHROMA_SIZES["1:1"])
     seed = random.randrange(2 ** 31) if seed is None or int(seed) < 0 else int(seed)
     client = client or comfy.Comfy()
+    # Painting is answered within the tool call, which Open WebUI gives up on after five minutes,
+    # so it does not wait behind an animation; the director can watch that job and paint after.
+    busy = client.pending()
+    if busy:
+        raise RuntimeError(f"ComfyUI is busy with {busy} job{'s' if busy > 1 else ''} (an animation, or pictures "
+                           f"from another chat); paint again when it is free, after watch_job shows that job done")
     graph = workflows.chroma_t2i(prompt, width, height, count=count, seed=seed, negative=negative)
     outputs = client.run(graph, labels=workflows.CHROMA_LABELS)
     tmp = tempfile.mkdtemp(prefix="studio-paint-")

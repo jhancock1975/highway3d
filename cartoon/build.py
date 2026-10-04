@@ -170,9 +170,12 @@ def build(script_path, out, work=None, engine="BLENDER_EEVEE", samples=96, res="
                 st.set(step="score (waiting for other renders to finish)")
                 time.sleep(60)
             st.set(step="score")
-            st.log("scoring (ACE-Step; nothing else runs meanwhile)")
-            _run([MUSIC, "-m", "cartoon.score", "--film", os.path.join(work, "film.json"), "--out", music_wav],
-                 log, cwd=ROOT)
+            from studio import gpu      # ACE-Step's ~14 GB, not beside the studio's Wan or its own music
+            with gpu.hold(on_wait=lambda why: st.set(step=f"score ({why})")):
+                st.set(step="score")
+                st.log("scoring (ACE-Step; nothing else runs meanwhile)")
+                _run([MUSIC, "-m", "cartoon.score", "--film", os.path.join(work, "film.json"), "--out", music_wav],
+                     log, cwd=ROOT)
         st.set(step="typeset")
         from cartoon.sets import marks as MK
         pngs = chalk.typeset(dict(doc.get("boards") or {}, **MK.GHOSTS), os.path.join(work, "chalk"))

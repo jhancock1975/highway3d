@@ -10,12 +10,15 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 os.environ["STUDIO_MEDIA"] = tempfile.mkdtemp(prefix="studio-media-")
-from studio import library, motion  # noqa: E402
+os.environ["STUDIO_GPU_LOCK"] = os.path.join(tempfile.mkdtemp(prefix="studio-gpu-"), "gpu.lock")
+from studio import gpu, library, motion  # noqa: E402
 
 SRC = tempfile.mkdtemp(prefix="studio-src-")
 
@@ -130,6 +133,49 @@ def test_last_frame_is_a_picture_of_the_clips_size():
     motion.last_frame(PHONE["path"], out)
     assert library.probe(out)["kind"] == "image" and library.probe(out)["width"] == 320
 
+
+
+def test_animating_waits_while_another_job_has_the_gpu():
+    c, out, done = FakeClient(), io.StringIO(), []
+    with contextlib.redirect_stdout(out):
+        with gpu.hold():
+            t = threading.Thread(target=lambda: done.append(motion.animate(PIC["id"], "x", seconds=1, client=c)))
+            t.start()
+            time.sleep(0.5)
+            assert c.graphs == [], "Wan was queued while another job had the GPU"
+        t.join(30)
+    assert done and len(c.graphs) == 1, (done, c.graphs)
+    assert "waiting for the GPU: another job is using it" in out.getvalue(), out.getvalue()
+
+
+def test_extending_a_final_clip_keeps_it_final():
+    c = FakeClient()
+    clip, _ = quiet(motion.animate, PIC["id"], "she turns", seconds=2, quality="final", client=c)
+    longer, _ = quiet(motion.extend, clip["id"], "she walks", seconds=2, client=c)
+    assert (longer["width"], longer["height"]) == (1280, 720), longer
+    assert longer["quality"] == "final", longer
+
+
+def test_an_imported_720p_clip_extends_at_720p():
+    hd = library.add(make("hd.mp4", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=24:duration=2",
+                          "-pix_fmt", "yuv420p"), "clip")
+    longer, _ = quiet(motion.extend, hd["id"], "on", seconds=1, client=FakeClient())
+    assert (longer["width"], longer["height"]) == (1280, 720), longer
+
+
+def test_draft_can_still_be_asked_for_when_extending():
+    c = FakeClient()
+    clip, _ = quiet(motion.animate, PIC["id"], "she turns", seconds=1, quality="final", client=c)
+    longer, _ = quiet(motion.extend, clip["id"], "on", seconds=1, quality="draft", client=c)
+    assert (longer["width"], longer["height"]) == (832, 480), longer
+
+
+def test_last_frame_of_a_clip_whose_sound_runs_on():
+    talky = make("talky.mp4", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=2",
+                 "-f", "lavfi", "-i", "sine=frequency=440:duration=4", "-pix_fmt", "yuv420p")
+    out = os.path.join(SRC, "talky-last.png")
+    motion.last_frame(talky, out)
+    assert library.probe(out)["width"] == 320
 
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]

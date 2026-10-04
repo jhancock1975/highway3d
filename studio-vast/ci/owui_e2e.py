@@ -44,6 +44,8 @@ ids = sorted(s["info"]["id"] for s in servers)
 check(ids == ["cartoon", "highway", "lectern", "studio"], f"four MCP tool servers ({ids})")
 model = call("GET", "/api/v1/models/model?id=studio-director", token=token)
 check(model and "director of a small film studio" in model["params"]["system"], "studio-director has the director prompt")
+check(model and "Never depict a real, identifiable person in anything" in model["params"]["system"],
+      "the director keeps real people out of everything it makes, as the spec says")
 check("server:mcp:studio" in model["meta"]["toolIds"] and "studio_ui" in model["meta"]["toolIds"],
       "studio-director carries studio_ui and the MCP servers")
 defaults = call("GET", "/api/v1/configs/models", token=token)

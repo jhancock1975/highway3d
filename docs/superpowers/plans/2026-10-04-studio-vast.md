@@ -1,6 +1,6 @@
 # studio-vast Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Work through the tasks in order. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A vast.ai container image in which an uncensored LLM, reached through a browser chat, directs an uncensored image model, Wan 2.2 image-to-video, Kokoro voices, ACE-Step music and every renderer in this repo to make films, with live progress and inline playback.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Work on branch `studio-vast` in the worktree `/Users/john/git/highway3d-studio-vast`. Never touch `/Users/john/git/adult`'s working tree.
-- Commit messages are one plain sentence in the repo's style ("Add ..., so ..."). No `feat:` prefixes. **No AI attribution of any kind:** no Co-Authored-By, no Claude-Session, no "Generated with".
+- Commit messages are one plain sentence in the repo's style ("Add ..., so ..."). No `feat:` prefixes. **No attribution of any kind:** no co-author trailers, session links or "generated with" footers.
 - Never commit `.env`, its backups, keys or tokens. The vast.ai API key lives only in `/Users/john/git/vast-render/.env`.
 - Python 3.12 for every venv in the image. Pin `mcp==2.2.0` wherever MCP is used; `forgiving.py` needs `mcp.server.mcpserver`.
 - Every model URL is pinned to a commit: `/resolve/<sha>/` for files, `hf download --revision <sha>` for repos. No Hugging Face token is ever needed.
@@ -36,7 +36,7 @@
   - `/Users/john/git/adult/studio/.venv/bin/python` for studio tests
   - `/Users/john/git/adult/lectern/.mcpvenv/bin/python`
   - `/Users/john/git/adult/cartoon/.venv/bin/python`
-  - the Open WebUI 0.11.4 venv at `/private/tmp/claude-501/-Users-john-git-vast-render/26778df9-debe-4b2b-98be-4efa3970339e/scratchpad/owui/.venv/bin/python`. Call it `$OWUI_PY` below.
+  - a local venv with Open WebUI 0.11.4 installed (`uv venv owui && uv pip install --python owui open-webui==0.11.4`). Call its python `$OWUI_PY` below.
 - curl URL checks use `curl --connect-timeout 2 --max-time 5` (raise `--max-time` only for downloads).
 - Renting GPUs is allowed once the user has added the auto-mode permission for `vast-studio.sh`. Destroy every instance you start as soon as its test is over, and check `vastai show instances` is empty.
 
@@ -1027,7 +1027,7 @@ Expected: `6/6 passed` and `7/7 passed`.
 
 - [ ] **Step 5: Validate both graphs against a real ComfyUI v0.38.0 on this Mac's CPU**
 
-A research subagent already set up a CPU ComfyUI v0.38.0 with placeholder model files at `/private/tmp/claude-501/-Users-john-git-vast-render/26778df9-debe-4b2b-98be-4efa3970339e/scratchpad/serving/`.
+A CPU ComfyUI v0.38.0 with placeholder model files was set up locally while researching this, in a scratch folder.
 1. Start it: `cd $SCRATCH/serving/comfyui-src && ../comfy-venv/bin/python main.py --cpu --base-directory ../comfy-base --port 18388` in the background.
 2. Copy a PNG into `../comfy-base/input/start.png`.
 3. POST each graph with `studio.workflows`. Use `S` for the studio venv's Python and run from the worktree:
@@ -3464,7 +3464,7 @@ Expected: both jobs succeed, and the summary lists `ghcr.io/jhancock1975/studio-
 
 On failure:
 1. Download the `smoke-test-output` artifact (`gh run download`) and read `container.log` and the FAIL lines.
-2. Fix the cause in the Dockerfile, scripts or code, commit with a sentence saying what was wrong, and push again. Use `superpowers:systematic-debugging` for anything not obvious.
+2. Fix the cause in the Dockerfile, scripts or code, commit with a sentence saying what was wrong, and push again. Find the cause before changing anything when it is not obvious.
 3. Likely trouble spots: the runner's disk (watch the `df` output; if the build runs out, move the vLLM install to first boot); the vLLM wheel URL; ACE-Step's torch pin; GIMP's AppImage on 24.04; Blender's software EGL for EEVEE.
 
 - [ ] **Step 7: Make the GHCR package public** (once, after the first push): `gh api -X PATCH /user/packages/container/studio-vast -f visibility=public`. If that endpoint refuses (visibility may only change in the web UI), open `https://github.com/users/jhancock1975/packages/container/studio-vast/settings` in Chrome and set it to Public under "Danger Zone". Ask the user before clicking the confirm button, because it publishes the package. Confirm with `curl --connect-timeout 2 --max-time 5 -s -o /dev/null -w '%{http_code}' https://ghcr.io/v2/jhancock1975/studio-vast/manifests/latest -H "Authorization: Bearer $(curl -s 'https://ghcr.io/token?scope=repository:jhancock1975/studio-vast:pull' | python3 -c 'import json,sys;print(json.load(sys.stdin)["token"])')" -H 'Accept: application/vnd.oci.image.index.v1+json'` → `200`.
@@ -3604,7 +3604,7 @@ plays the person's side of a short conversation:
 After each turn it checks the director made what was asked (pic-, clip-, voice-, music-
 ids, and a film in the renders). Then it downloads the film and checks it has video and
 audible sound of a plausible length, and writes a contact sheet of six frames to
-acceptance-out/ for a person (or Claude) to look at.
+acceptance-out/ to look at.
 """
 import json
 import os
@@ -3737,7 +3737,7 @@ if __name__ == "__main__":
 - [ ] **Step 3: Fix what failed and repeat**
 
 For every failure:
-1. Use `superpowers:systematic-debugging`, reading the instance logs through `vastai logs <id>` or the Jupyter terminal via the portal.
+1. Find the cause, reading the instance logs through `vastai logs <id>` or the Jupyter terminal via the portal.
 2. Fix it in the repo with a test where one is possible, and commit.
 3. Wait for CI to rebuild `:latest`.
 4. Re-run Step 2.
@@ -3775,4 +3775,4 @@ git commit -m "Document the studio-vast image: what runs in it, the models and t
 git push
 ```
 
-- [ ] **Step 3: Finish the branch** with `superpowers:finishing-a-development-branch`. Offer the user a pull request from `studio-vast` into `main`, with the PR body written in their voice and with no AI attribution. Leave the worktree in place unless they say otherwise.
+- [ ] **Step 3: Finish the branch.** Open a pull request from `studio-vast` into `main`. Leave the worktree in place unless they say otherwise.

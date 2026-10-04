@@ -17,4 +17,5 @@ export WEBUI_AUTH=False ENABLE_OLLAMA_API=False OFFLINE_MODE=True \
        STUDIO_WORK STATIC_DIR
 /usr/bin/python3 /opt/studio-vast/bin/owui-setup.py &
 cd "$DATA_DIR"
-pty /opt/openwebui/bin/open-webui serve --host 127.0.0.1 --port 18081
+# exec, not pty: pty turned a crash into a clean exit, and supervisor only restarts unexpected ones.
+exec /opt/openwebui/bin/open-webui serve --host 127.0.0.1 --port 18081

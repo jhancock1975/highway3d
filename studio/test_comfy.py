@@ -134,6 +134,20 @@ def test_unreachable_comfyui_is_a_sentence():
         raise AssertionError("no error")
 
 
+
+def test_a_node_error_over_several_lines_reads_as_one():
+    said = C._failure({"messages": [["execution_error", {
+        "node_type": "UNETLoader",
+        "exception_message": "Error while deserializing header: MetadataIncompleteBuffer\n"
+                             "File path: /workspace/models/x.safetensors\n\nThe safetensors file is corrupt."}]]})
+    assert "\n" not in said and "File path: /workspace/models/x.safetensors" in said, said
+
+
+def test_busy_counts_the_running_and_waiting_prompts():
+    expected = 1 + (1 if POLLS["p1"] < 2 else 0)
+    assert C.Comfy(URL).pending() == expected
+
+
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     bad = 0

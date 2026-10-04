@@ -206,6 +206,7 @@ for t in $(docker exec "$NAME" bash -c 'cd /opt/highway3d && ls studio/test_*.py
     inside "$t" "cd /opt/highway3d && studio/.venv/bin/python $t"
 done
 inside "cartoon/test_cartoon.py" 'cd /opt/highway3d && cartoon/.venv/bin/python cartoon/test_cartoon.py'
+inside "cartoon/test_score.py" 'cd /opt/highway3d && cartoon/.venv/bin/python cartoon/test_score.py'
 inside "test_forgiving.py" 'cd /opt/highway3d && lectern/.mcpvenv/bin/python test_forgiving.py'
 inside "lectern/test_status.py" 'cd /opt/highway3d && lectern/.mcpvenv/bin/python lectern/test_status.py'
 inside "test_blender_gpu.py" 'cd /opt/highway3d && python3 test_blender_gpu.py'
@@ -214,10 +215,20 @@ inside "the Open WebUI tool's tests" '/opt/openwebui/bin/python /opt/studio-vast
 section "Open WebUI (127.0.0.1:18081)"
 wait_until 900 "Open WebUI answers /health" icurl -f http://127.0.0.1:18081/health
 wait_until 300 "owui-setup.py configured Open WebUI" docker exec "$NAME" grep -q "studio: Open WebUI configured" /var/log/portal/openwebui.log
+inside "a banner says the director's model isn't up yet" 'python3 /ci/banner.py http://127.0.0.1:18081 present'
 # vLLM needs a GPU and a model; a stand-in answers on its port so the chat can run.
 docker exec -d "$NAME" python3 /ci/fake_llm.py 18000 studio-llm
-sleep 2
+wait_until 120 "the banner goes once the director answers" docker exec "$NAME" python3 /ci/banner.py http://127.0.0.1:18081 absent
 inside "a chat through Open WebUI's API reaches the studio MCP server" 'python3 /ci/owui_e2e.py http://127.0.0.1:18081'
+# A crash is a kill -9 of the server itself; supervisor must start it again.
+inside "Open WebUI comes back after a crash" \
+    'old=$(pgrep -f "^/opt/openwebui/bin/python[0-9.]* /opt/openwebui/bin/open-webui serve" | head -1); test -n "$old" && kill -9 $old &&
+     for i in $(seq 90); do sleep 2; new=$(pgrep -f "^/opt/openwebui/bin/python[0-9.]* /opt/openwebui/bin/open-webui serve" | head -1);
+       [ -n "$new" ] && [ "$new" != "$old" ] && curl -sf -m 3 http://127.0.0.1:18081/health >/dev/null && exit 0; done; exit 1'
+inside "the studio MCP server comes back after a crash" \
+    'old=$(pgrep -f "^/opt/venvs/tools/bin/python[0-9.]* -m studio.mcp_server --host 127.0.0.1 --port 8768" | head -1); test -n "$old" && kill -9 $old &&
+     for i in $(seq 60); do sleep 2; new=$(pgrep -f "^/opt/venvs/tools/bin/python[0-9.]* -m studio.mcp_server --host 127.0.0.1 --port 8768" | head -1);
+       [ -n "$new" ] && [ "$new" != "$old" ] && /opt/venvs/tools/bin/python /ci/mcp_list.py http://127.0.0.1:8768/mcp studio_list >/dev/null 2>&1 && exit 0; done; exit 1'
 
 section "Instance Portal and Caddy (TLS + token auth)"
 wait_until 300 "Instance Portal answers on 127.0.0.1:11111" icurl -f http://127.0.0.1:11111/

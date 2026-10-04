@@ -16,6 +16,10 @@ from studio import images, library  # noqa: E402
 class FakeClient:
     def __init__(self):
         self.graphs = []
+        self.busy = 0
+
+    def pending(self):
+        return self.busy
 
     def run(self, graph, on_progress=None, labels=None, **kw):
         self.graphs.append(graph)
@@ -74,6 +78,19 @@ def test_unknown_aspect_falls_back_to_square():
     c = FakeClient()
     notes = images.paint("x", aspect="auto", client=c)
     assert (notes[0]["width"], notes[0]["height"]) == (1024, 1024)
+
+
+
+def test_a_busy_comfyui_is_refused_at_once():
+    c = FakeClient()
+    c.busy = 2
+    try:
+        images.paint("a lighthouse", "16:9", 1, client=c)
+    except RuntimeError as e:
+        assert "busy" in str(e) and "2" in str(e), str(e)
+    else:
+        raise AssertionError("painted while ComfyUI was busy")
+    assert c.graphs == [], "the graph was queued anyway"
 
 
 def main():
