@@ -21,3 +21,5 @@ studio/.work
 .env
 .env.*
 *~
+studio-vast/ci
+studio-vast/README.md

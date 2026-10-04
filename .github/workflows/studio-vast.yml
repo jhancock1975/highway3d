@@ -110,9 +110,11 @@ jobs:
             --label org.opencontainers.image.revision="${{ github.sha }}" \
             --label org.opencontainers.image.created="${{ steps.tags.outputs.created }}" \
             --cache-from type=registry,ref="$IMAGE:latest" \
+            --cache-from type=registry,ref="$IMAGE:build-cache" \
             --cache-to type=inline \
             --provenance=false \
             --tag "$IMAGE:${{ steps.tags.outputs.short_sha }}" \
+            --tag "$IMAGE:build-cache" \
             --push
 
       - name: Check the base layers kept vast's digests

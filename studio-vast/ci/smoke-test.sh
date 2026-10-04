@@ -153,7 +153,7 @@ inside "lectern MCP lists its tools" "$T /ci/mcp_list.py http://127.0.0.1:8767/m
 inside "highway3d MCP lists its tools" "$T /ci/mcp_list.py http://127.0.0.1:8766/mcp highway_render"
 
 section "engines, on the CPU"
-docker exec "$NAME" bash -c 'cat > /tmp/eevee.py' <<'EOF'
+docker exec -i "$NAME" bash -c 'cat > /tmp/eevee.py' <<'EOF'
 import bpy
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
@@ -173,7 +173,7 @@ EOF
 inside "Blender renders EEVEE headless" 'blender -b --factory-startup --python /tmp/eevee.py 2>&1 | tail -5; test -s /tmp/eevee.png'
 inside "blender_gpu picks the CPU on a GPU-less machine" \
     "blender -b --python-expr \"import sys; sys.path.insert(0, '/opt/highway3d'); import bpy, blender_gpu; print('GPU', blender_gpu.enable(bpy))\" 2>&1 | grep -x 'GPU CPU'"
-docker exec "$NAME" bash -c 'mkdir -p /tmp/tex && cat > /tmp/tex/t.py' <<'EOF'
+docker exec -i "$NAME" bash -c 'mkdir -p /tmp/tex && cat > /tmp/tex/t.py' <<'EOF'
 from manim import MathTex, Scene
 
 

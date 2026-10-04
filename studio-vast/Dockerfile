@@ -83,10 +83,9 @@ RUN set -euo pipefail && \
     VIRTUAL_ENV=/opt/openwebui uv pip install --no-cache --torch-backend cpu "open-webui==0.11.4" && \
     /opt/openwebui/bin/python -c "import open_webui; print('OWUI_OK')"
 
-COPY . /opt/highway3d
-COPY studio-vast/ROOT/ /
-
-# The venvs the repo's tools expect, by the names its code uses:
+# The venvs the repo's tools expect, by the names its code uses. They are built before the
+# repo is copied in, so a change to the code does not rebuild them (the build context leaves
+# every venv out, so the copy keeps these):
 #  - one shared venv for the MCP servers and the plain tools, linked under each tool's name;
 #  - .ttsvenv (Kokoro) and lectern/.musicvenv (ACE-Step) on top of /venv/main's CUDA torch,
 #    which is pinned so nothing replaces it. The pin (torch==2.10.0+cu128) only resolves with
@@ -98,7 +97,8 @@ COPY studio-vast/ROOT/ /
 #    against the pango/cairo headers installed above. ACE-Step is installed from a checkout because its
 #    nano-vllm dependency is a folder inside its own repo;
 #  - lectern/.manimvenv for Manim.
-RUN set -euo pipefail && cd /opt/highway3d && \
+RUN set -euo pipefail && mkdir -p /opt/highway3d/studio /opt/highway3d/cartoon /opt/highway3d/lectern \
+        /opt/highway3d/highway3d /opt/highway3d/highway && cd /opt/highway3d && \
     uv venv --python /usr/bin/python3.12 /opt/venvs/tools && \
     VIRTUAL_ENV=/opt/venvs/tools uv pip install --no-cache "mcp==2.2.0" numpy pillow pyyaml soundfile \
         fonttools scipy scikit-image imageio matplotlib websocket-client anyio uvicorn && \
@@ -123,6 +123,9 @@ RUN set -euo pipefail && cd /opt/highway3d && \
     VIRTUAL_ENV=/opt/highway3d/lectern/.manimvenv uv pip install --no-cache "manim==0.21.0" "manimpango==0.6.1" numpy pillow scipy pyyaml && \
     lectern/.manimvenv/bin/python -c "import manim; print('MANIM_OK', manim.__version__)" && \
     rm -f /tmp/torch-pins.txt
+
+COPY . /opt/highway3d
+COPY studio-vast/ROOT/ /
 
 # Fonts, the Kenney cars and the Poly Haven assets the renderers fetch on first use, fetched now.
 # (highway3d/setup.sh does the cars too, but ends with a Blender render, which is the smoke test's job.)
