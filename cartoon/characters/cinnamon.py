@@ -116,7 +116,11 @@ def build(coll=None, voxel=0.0028):
     for side in (".L", ".R"):
         for b in ("arm", "forearm", "hand"):
             limb_bones[b + side] = X.J["arm" + side]
+        # the feet too: bone heat gave a V-shaped patch of the chest wholly to
+        # the feet, and every move of the body tore a fine V seam there
+        limb_bones["foot" + side] = X.J["foot" + side]
     R.limbs_only(body, {"arm", "hand", "f1", "f2", "f3", "foot"}, limb_bones, near=0.035, reach=0.085)
+    _own_limb_only(body)
     # jaw, and fingers by segment, on top of the heat weights
     P = C.verts_np(body)
     lab = C.labels_np(body)
@@ -185,7 +189,7 @@ def build(coll=None, voxel=0.0028):
         keys[k] = keys[k] * 1.6
     for k in [k for k in keys if k.startswith("cheek_")]:
         keys[k] = keys[k] * 1.5
-    keys.update(F.open_key(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, drop=0.032, sigma=0.045))
+    keys.update(F.open_key(P, X.MOUTH_C, X.MOUTH_HALF_W, X.SMILE_LIFT, drop=0.032, sigma=0.045, sigma_down=0.1))
     keys["nostril_flare"] = _nostril_flare(P)
     keys["nose_scrunch"] = _nose_scrunch(P)
     F.add_keys(body, keys)
@@ -220,6 +224,29 @@ def build(coll=None, voxel=0.0028):
     return dict(rig=arm, body=body, eyes=eyes, antennae=ants, tongue=tongue, coll=coll)
 
 
+def _own_limb_only(body):
+    """An arm's skin follows no foot, and a foot's no arm. limbs_only leaves
+    limb vertices alone, and bone heat had given 31 under the upper arms a
+    few percent of a foot each."""
+    lab = C.labels_np(body)
+    names = {g.index: g.name for g in body.vertex_groups}
+    arm_labels = {"arm", "hand", "f1", "f2", "f3"}
+    arm_bone = ("arm", "forearm", "hand", "f_")
+    cut = 0
+    for v in body.data.vertices:
+        drop = []
+        for g in v.groups:
+            n = names[g.group]
+            if (lab[v.index] in arm_labels and n.startswith("foot")) or \
+                    (lab[v.index] == "foot" and n.startswith(arm_bone)):
+                drop.append(g.group)
+        for gi in drop:
+            body.vertex_groups[gi].remove([v.index])
+            cut += 1
+    R.normalise(body)
+    C.log(f"{body.name}: {cut} weights to another limb removed")
+
+
 def _bean_bends(body):
     """A bean bends through its whole body; it has no neck to hinge at.
 
@@ -244,13 +271,18 @@ def _bean_bends(body):
     trunk = [i for i in range(len(P)) if lab[i] not in limbs]
     for i in trunk:
         v = body.data.vertices[i]
+        # read the groups first, then remove: removing while walking the
+        # vertex's own group list shifted it under the loop, skipped entries,
+        # and left the jaw's weight on 4766 vertices of mouth, muzzle and
+        # chest -- following the head rigidly while the skin round them bent,
+        # it tore a fine V-shaped seam across the chest whenever it moved
+        have = [(g.group, g.weight) for g in v.groups]
         limb_w = 0.0
-        for g in list(v.groups):
-            name = body.vertex_groups[g.group].name
-            if name in ("root", "body", "head", "jaw"):
-                body.vertex_groups[g.group].remove([i])
+        for gi, w in have:
+            if body.vertex_groups[gi].name in ("root", "body", "head", "jaw"):
+                body.vertex_groups[gi].remove([i])
             else:
-                limb_w += g.weight
+                limb_w += w
         rest = max(0.0, 1.0 - limb_w)
         for n, w in (("root", w_root[i]), ("body", w_body[i]), ("head", w_head[i])):
             if w * rest > 1e-4:

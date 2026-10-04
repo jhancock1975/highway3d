@@ -217,18 +217,26 @@ def basel(f0, f1, fps):
         if k <= 4:
             # slashed, all four: no font here has a one-ninth glyph, and a
             # missing glyph renders as nothing
-            lab = ["1", "1/4", "1/9", "1/16"][k - 1]
-            tx = text(f"v.basel_lab{k}", lab, CENTER + Vector((R * 0.72, 0.38, R * 0.72)), 0.12,
+            # the sum building in a column at the right as each ring
+            # arrives -- on the rings themselves, which mostly run past the
+            # frame, the labels were specks at its edge
+            lab = ["1", "+ 1/4", "+ 1/9", "+ 1/16"][k - 1]
+            tx = text(f"v.basel_lab{k}", lab, CENTER + Vector((0.56, -0.1, 0.4 - 0.16 * (k - 1))), 0.11,
                       glow("v.lab", (1, 0.9, 0.7), 4.0), font=FONT)
-            key_scale(tx, [f0, f_on, f_on + 8, f_on + 30, f_on + 40],
-                      lambda f, f_on=f_on: 0.0 if f < f_on else (1.0 if f < f_on + 30 else 0.0))
+            # nothing until its ring arrives: keyed only at the start and at
+            # the ring, it grew from nothing over the whole wait
+            key_scale(tx, [f0, f_on - 1, f_on, f_on + 4, f1],
+                      lambda f, f_on=f_on: 0.0 if f < f_on else (1.15 if f < f_on + 4 else 1.0))
     # the settled glow and its name
     core = sphere("v.basel_core", 0.3, CENTER + Vector((0, 0.45, 0.05)), glow("v.core", (1.0, 0.75, 0.4), 1.0, 0.3))
     f_set = f0 + int(3.2 * fps)
     key_scale(core, [f0, f_set, f_set + 20, f1], lambda f: 0.0 if f < f_set else (1.0 if f > f_set + 15 else 0.6))
-    tx = text("v.basel_name", "π²/6", CENTER + Vector((0, -0.3, 0.72)), 0.2, glow("v.name", (1, 0.95, 0.8), 6.0),
-              font=MATH_FONT)
-    key_scale(tx, [f0, f_set + 10, f_set + 22, f1], lambda f: 0.0 if f < f_set + 10 else 1.0)
+    # the sum's answer, under the column -- where the camera sees it: at
+    # 0.72 up it was above the frame in every cut
+    tx = text("v.basel_name", "= π²/6", CENTER + Vector((0.56, -0.15, 0.4 - 0.16 * 4 - 0.04)), 0.14,
+              glow("v.name", (1, 0.95, 0.8), 6.0), font=MATH_FONT)
+    key_scale(tx, [f0, f_set + 9, f_set + 10, f_set + 16, f1],
+              lambda f: 0.0 if f < f_set + 10 else (1.2 if f < f_set + 16 else 1.0))
     camera(f0, f1)
 
 

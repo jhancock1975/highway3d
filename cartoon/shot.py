@@ -312,11 +312,43 @@ def camera(setup, f0, f1, film, P=None, shot=None):
         pre = max(0, f0 - 48)
         seg = np.array([lag_series(subj[pre:f1 + 1, i], film["fps"], 0.35) for i in range(3)]).T
         k = s.get("follow", 0.8)
+        # Cinnamon's top (antennae and all) and bottom, and Euler's head:
+        # the frame keeps all of them. Following the midpoint alone, when
+        # Cinnamon rose to its high mark after the spin, cut its head off at
+        # the top of the frame; tilting up alone then lost Euler at the bottom.
+        lagged = np.array([lag_series(cp[pre:f1 + 1, i], film["fps"], 0.35) for i in range(3)]).T
+        raw = cp[pre:f1 + 1]
+        half_v = math.atan(18.0 / s["lens"] * 9 / 16) - 0.05
+        eh = Vector(MK.HEAD_EULER)
         for f in range(f0, f1 + 1, 2):
             off = (seg[f - pre] - ref) * k
             push = (tgt - loc0) * 0.04 * ((f - f0) / n)
             cam.location = loc0 + Vector(off) * (0.7 if track == "both" else 1.0) + push
-            C.aim(cam, tgt + Vector(off))
+            aim_at = tgt + Vector(off)
+            if track == "both":
+                c_now = [Vector(lagged[f - pre]), Vector(raw[f - pre])]
+                pts = [c + Vector((0, 0, 0.42)) for c in c_now] + [c + Vector((0, 0, -0.26)) for c in c_now] + \
+                      [eh + Vector((0, 0, 0.2)), eh + Vector((0, 0, -0.16))]
+                for _ in range(3):
+                    fwd = (aim_at - cam.location).normalized()
+                    hz = Vector((fwd.x, fwd.y, 0)).normalized()
+                    pitch0 = math.atan2(fwd.z, Vector((fwd.x, fwd.y, 0)).length)
+                    angs = []
+                    for p_ in pts:
+                        w = p_ - cam.location
+                        angs.append(math.atan2(w.z, max(1e-6, w.dot(hz))))
+                    lo, hi = min(angs), max(angs)
+                    if hi - lo > 2 * half_v:
+                        # both cannot fit: step back along the view until they do
+                        cam.location = cam.location - fwd * (aim_at - cam.location).length * 0.12
+                        continue
+                    want = min(max(pitch0, hi - half_v), lo + half_v)
+                    if abs(want - pitch0) < 1e-3:
+                        break
+                    d = (aim_at - cam.location)
+                    flat = Vector((d.x, d.y, 0)).length
+                    aim_at = Vector((aim_at.x, aim_at.y, cam.location.z + flat * math.tan(want)))
+            C.aim(cam, aim_at)
             cam.keyframe_insert("location", frame=f)
             cam.keyframe_insert("rotation_euler", frame=f)
     else:
@@ -347,6 +379,7 @@ def main():
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--frames", help="only these frames, e.g. 1200:1210 or 1205")
     ap.add_argument("--save-blend", action="store_true")
+    ap.add_argument("--step", type=int, default=1, help="render every Nth frame (for review sheets)")
     a = ap.parse_args(argv)
     if a.prepare:
         prepare(a.prepare, a.out)
@@ -386,6 +419,7 @@ def main():
             sc.frame_start, sc.frame_end = int(x), int(y)
         else:
             sc.frame_start = sc.frame_end = int(a.frames)
+    sc.frame_step = max(1, a.step)
     os.makedirs(a.out, exist_ok=True)
     if a.save_blend:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(os.path.abspath(a.out), f"shot{a.shot:03d}.blend"))

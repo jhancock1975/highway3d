@@ -89,6 +89,13 @@ def tooth():
 TOOTH_BOUNDS = ((-0.03, -0.21, -0.03), (0.03, -0.15, 0.03))
 
 
+# How far the elbows and wrists stand out from the belly at rest. Closer,
+# and the smooth union melted the forearm into the belly: a web of body skin
+# that stayed put when the arm rose and stretched into a striped sheet under
+# the hand. 3.5 cm leaves 4.3 cm clear at the elbow, more than any blend.
+ARM_OUT = 0.035
+
+
 def body():
     """Everything but the antennae and the tongue. (It has no eyes.)"""
     mx, my, mz = MOUTH_C
@@ -116,8 +123,8 @@ def body():
     for s in (1, -1):
         # stubby arms, reaching forward a little, three fat fingers each
         sh = np.array((s * 0.14, -0.02, -0.02))
-        el = np.array((s * 0.19, -0.06, -0.08))
-        wr = np.array((s * 0.2, -0.12, -0.11))
+        el = np.array((s * (0.19 + ARM_OUT), -0.06, -0.08))
+        wr = np.array((s * (0.2 + ARM_OUT), -0.12, -0.11))
         parts.append(S.blend(Capsule(sh, el, 0.034, 0.028, color=BODY, label="arm"), 0.03))
         parts.append(S.blend(Capsule(el, wr, 0.028, 0.026, color=BODY, label="arm"), 0.015))
         parts.append(S.blend(Sphere(wr + np.array((0, -0.012, -0.004)), 0.03, color=BODY, label="hand"), 0.012))
@@ -169,7 +176,7 @@ FINGER_OFFSETS = {"f1": (-0.016, 0.006), "f2": (0.0, 0.0), "f3": (0.016, -0.004)
 
 def finger_points(s, name):
     dx, dz = FINGER_OFFSETS[name]
-    wr = np.array((s * 0.2, -0.132, -0.114))
+    wr = np.array((s * (0.2 + ARM_OUT), -0.132, -0.114))
     base = wr + np.array((-s * dx * 1.0, -0.018, dz))
     mid = base + np.array((-s * dx * 0.3, -0.022, -0.006))
     tip = mid + np.array((-s * dx * 0.2, -0.016, -0.012))
@@ -236,9 +243,9 @@ J = {
     "head": (0.0, 0.0, 0.08),
     "head_top": (0.0, 0.0, 0.24),
     "arm.L": (0.14, -0.02, -0.02),
-    "forearm.L": (0.19, -0.06, -0.08),
-    "hand.L": (0.2, -0.12, -0.11),
-    "hand_end.L": (0.2, -0.15, -0.118),
+    "forearm.L": (0.19 + ARM_OUT, -0.06, -0.08),
+    "hand.L": (0.2 + ARM_OUT, -0.12, -0.11),
+    "hand_end.L": (0.2 + ARM_OUT, -0.15, -0.118),
     "foot.L": (0.065, -0.03, -0.18),
     "foot_end.L": (0.065, -0.1, -0.21),
 }
