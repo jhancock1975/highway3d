@@ -32,11 +32,8 @@ from cartoon.sets import marks as MK  # noqa: E402
 
 
 def gpu_setup():
-    prefs = bpy.context.preferences.addons["cycles"].preferences
-    prefs.compute_device_type = "METAL"
-    prefs.refresh_devices()
-    for d in prefs.devices:
-        d.use = True
+    import blender_gpu
+    blender_gpu.enable(bpy)
 
 
 def render_settings(engine, res, samples, fps=24):

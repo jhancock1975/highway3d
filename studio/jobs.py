@@ -40,7 +40,7 @@ def start(job: str, module: str, args: list[str], header: dict) -> str:
 
 def live() -> set[str]:
     """Jobs whose process is still running, whichever server started them."""
-    r = subprocess.run(["ps", "-axww", "-o", "args="], capture_output=True,
+    r = subprocess.run(["ps", "-A", "-ww", "-o", "args="], capture_output=True,
                        text=True)
     return set(re.findall(r"-m studio\.\w+ .*--job (\w+)", r.stdout))
 

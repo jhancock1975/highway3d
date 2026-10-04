@@ -32,10 +32,21 @@ def test_room_means_no_refusal():
 
 def test_no_room_is_a_sentence_with_the_numbers():
     got = M.refusal("speech", 6.0)
-    assert got == ("The Mac has 6 GB available and speech needs about 3 GB "
+    assert got == (f"The {M.MACHINE} has 6 GB available and speech needs about 3 GB "
                    "plus 4 GB of headroom; try again when the other work "
                    "finishes."), got
     assert "drawing needs about 1 GB" in M.refusal("gimp", 1.0)
+
+
+MEMINFO = """MemTotal:       65843916 kB
+MemFree:         1234567 kB
+MemAvailable:   41943040 kB
+Buffers:          123456 kB
+"""
+
+
+def test_linux_reads_memavailable():
+    assert M.available_gb(meminfo_text=MEMINFO) == 40.0
 
 
 def test_this_mac_reads():

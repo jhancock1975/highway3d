@@ -132,7 +132,12 @@ def generate(cues, cache):
     from acestep.handler import AceStepHandler
     from acestep.inference import GenerationConfig, GenerationParams, generate_music
     from acestep.llm_inference import LLMHandler
-    dev = "mps" if torch.backends.mps.is_available() else "cpu"
+    if torch.cuda.is_available():
+        dev = "cuda"
+    elif torch.backends.mps.is_available():
+        dev = "mps"
+    else:
+        dev = "cpu"
     dit = AceStepHandler()
     msg, ok = dit.initialize_service(project_root=ACE_HOME, config_path=DIT, device=dev)
     if not ok:
@@ -169,6 +174,8 @@ def generate(cues, cache):
     del dit, lm
     if dev == "mps":
         torch.mps.empty_cache()
+    elif dev == "cuda":
+        torch.cuda.empty_cache()
     return todo
 
 
