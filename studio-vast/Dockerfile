@@ -82,7 +82,8 @@ COPY studio-vast/ROOT/ /
 # The venvs the repo's tools expect, by the names its code uses:
 #  - one shared venv for the MCP servers and the plain tools, linked under each tool's name;
 #  - .ttsvenv (Kokoro) and lectern/.musicvenv (ACE-Step) on top of /venv/main's CUDA torch,
-#    which is pinned so nothing replaces it. ACE-Step is installed from a checkout because its
+#    which is pinned so nothing replaces it. The pin (torch==2.10.0+cu128) only resolves with
+#    PyTorch's own index in reach; PyPI has no +cu128 builds. ACE-Step is installed from a checkout because its
 #    nano-vllm dependency is a folder inside its own repo;
 #  - lectern/.manimvenv for Manim.
 RUN set -euo pipefail && cd /opt/highway3d && \
@@ -95,6 +96,7 @@ RUN set -euo pipefail && cd /opt/highway3d && \
         | grep -E '^(torch|torchvision|torchaudio)==' | sort > /tmp/torch-pins.txt && cat /tmp/torch-pins.txt && \
     uv venv --python /venv/main/bin/python --system-site-packages .ttsvenv && \
     VIRTUAL_ENV=/opt/highway3d/.ttsvenv uv pip install --no-cache -c /tmp/torch-pins.txt \
+        --extra-index-url https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match \
         "kokoro==0.9.4" "misaki[en]==0.9.4" soundfile pyyaml \
         "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" && \
     .ttsvenv/bin/python -c "import kokoro, spacy, torch; spacy.load('en_core_web_sm'); print('TTS_OK', torch.__version__)" && \
