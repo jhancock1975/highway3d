@@ -98,6 +98,16 @@ def test_start_writes_header_and_runs():
     assert first.startswith("JOB ") and json.loads(first[4:])["name"] == "probe", first
 
 
+def test_a_finished_job_names_what_it_made():
+    job = "aa11bb"
+    log = os.path.join(J.WORK, f"job-{job}.log")
+    with open(log, "w") as fh:
+        fh.write('JOB {"name": "animate pic-1a2b"}\n')
+        fh.write('DONE {"out": "/m/out.mp4", "seconds": 5.1, "bytes": 2000000, "took": 70, "asset": "clip-9c01"}\n')
+    said = J.status(job)
+    assert "clip-9c01" in said and "finished" in said, said
+
+
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     bad = 0
