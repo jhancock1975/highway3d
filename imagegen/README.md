@@ -8,9 +8,10 @@ end. Both UIs use the same ComfyUI process, the same GPU and the same models fol
 No model weights are in the image. On first boot the instance downloads them from
 Hugging Face (no token needed) into `/workspace/ComfyUI/models`.
 
-Image: `ghcr.io/jhancock1975/imagegen-vast:latest` (every build is also tagged with its
-7-character commit, e.g. `ghcr.io/jhancock1975/imagegen-vast:1a2b3c4`; use one of those to
-pin a version).
+Image: `ghcr.io/jhancock1975/imagegen-vast:latest`. It is public, so vast needs no registry
+login. Every build is also tagged with its 7-character commit (e.g.
+`ghcr.io/jhancock1975/imagegen-vast:5fd35fd`); use one of those to pin a version.
+`:latest` only moves after a build passes the checks described at the end.
 
 ## The models
 
