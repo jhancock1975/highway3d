@@ -73,12 +73,18 @@ section "start the container"
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=localhost" \
     -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
     -keyout "$OUT/instance.key" -out "$OUT/instance.crt" 2>/dev/null
+if docker image inspect "$IMAGE" --format '{{range .Config.Env}}{{println .}}{{end}}' |
+        grep -q '^COMFYUI_ARGS=.*--disable-smart-memory'; then
+    pass "ComfyUI lets go of the GPU after each prompt (--disable-smart-memory)"
+else
+    fail "ComfyUI keeps its models on the GPU: COMFYUI_ARGS lacks --disable-smart-memory"
+fi
 docker rm -f "$NAME" >/dev/null 2>&1 || true
 docker create --name "$NAME" --shm-size=4g \
     -e OPEN_BUTTON_TOKEN="$TOKEN" \
     -e VAST_TCP_PORT_1111=1111 -e VAST_TCP_PORT_8081=8081 -e VAST_TCP_PORT_8188=8188 \
     -e STUDIO_MODELS=none \
-    -e COMFYUI_ARGS="--disable-auto-launch --enable-cors-header --port 18188 --cpu" \
+    -e COMFYUI_ARGS="--disable-auto-launch --enable-cors-header --port 18188 --disable-smart-memory --cpu" \
     "$IMAGE" --no-update-portal --no-update-vast >/dev/null
 docker cp "$OUT/instance.crt" "$NAME:/etc/instance.crt"
 docker cp "$OUT/instance.key" "$NAME:/etc/instance.key"

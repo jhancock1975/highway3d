@@ -158,6 +158,10 @@ ENV PORTAL_CONFIG="localhost:1111:11111:/:Instance Portal|localhost:8081:18081:/
     ENABLE_HTTPS=true \
     STUDIO_MODELS=all
 
+# ComfyUI hands its models back to RAM after every prompt. Kept on the GPU, Wan's 44 GB beside
+# vLLM's 42 left ACE-Step 7 GB and it died loading; reloading from RAM costs a second or two.
+ENV COMFYUI_ARGS="--disable-auto-launch --enable-cors-header --port 18188 --disable-smart-memory"
+
 EXPOSE 1111 8081 8188 8080
 
 # vast's derivatives all end with this; it guards against stale environments when a workspace

@@ -48,6 +48,10 @@ check("server:mcp:studio" in model["meta"]["toolIds"] and "studio_ui" in model["
       "studio-director carries studio_ui and the MCP servers")
 defaults = call("GET", "/api/v1/configs/models", token=token)
 check(defaults.get("DEFAULT_MODELS") == "studio-director", f"studio-director is the default ({defaults.get('DEFAULT_MODELS')})")
+ui = (call("GET", "/api/v1/users/user/settings", token=token) or {}).get("ui") or {}
+check(ui.get("iframeSandboxAllowSameOrigin") is True,
+      "chat embeds may send vast's login cookie, so their pictures and videos load through Caddy")
+check(ui.get("showChangelog") is False, "no What's New dialog over the first chat")
 
 chat = call("POST", "/api/v1/chats/new", {"chat": {"title": "e2e", "models": ["studio-director"], "messages": [], "history": {"messages": {}, "currentId": None}}}, token=token)
 user_id, reply_id = str(uuid.uuid4()), str(uuid.uuid4())

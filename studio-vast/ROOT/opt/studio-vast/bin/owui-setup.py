@@ -94,6 +94,14 @@ def main():
                                                          "DEFAULT_MODEL_METADATA": {}, "DEFAULT_MODEL_PARAMS": {}}, token)
     if status != 200:
         raise RuntimeError(f"default model: HTTP {status}")
+    # The pictures and videos studio_ui shows sit in a sandboxed iframe. Without same-origin, Chrome
+    # treats its requests as cross-site and holds back vast's SameSite=Lax login cookie, so Caddy
+    # answers every /static request with its password prompt and nothing loads. UI settings are
+    # patched field by field, so the person's other settings stay as they are.
+    status, _ = call("POST", "/api/v1/users/user/settings/update",
+                     {"ui": {"iframeSandboxAllowSameOrigin": True, "showChangelog": False}}, token)
+    if status != 200:
+        raise RuntimeError(f"chat settings: HTTP {status}")
     print("studio: Open WebUI configured (studio_ui, four MCP servers, studio-director as the default)", flush=True)
 
 

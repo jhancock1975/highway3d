@@ -33,7 +33,9 @@ Open WebUI's own sign-in is off; vast's Caddy fronts every port with TLS and the
 button's token, so the token is the login. `owui-setup.py` configures Open WebUI through
 its API on every boot: the `studio_ui` tool (live progress, inline media), the four MCP
 servers as tool servers, and the **Studio Director** model, which is the default for new
-chats.
+chats. It also turns on the chat setting *iframe sandbox: allow same origin*: the media
+`studio_ui` shows sits in a sandboxed frame, and without same-origin Chrome holds back
+vast's login cookie from it, so Caddy refuses every picture and video.
 
 ## The models
 
@@ -59,8 +61,11 @@ scene. Beyond that the director does not refuse adult subject matter.
 
 One RTX PRO 6000 (96 GB). vLLM takes 42% of it (about 40 GB: the FP8 weights, a 64k-token
 context and its cache), and the rest is shared one job at a time by ComfyUI (Chroma about
-25 GB, Wan about 35-45 GB at 720p), ACE-Step (about 14 GB) and Blender. `VLLM_GPU_UTIL`
-and `VLLM_MAX_MODEL_LEN` change vLLM's share if a different card is used.
+25 GB, Wan about 35-45 GB at 720p), ACE-Step (about 14 GB) and Blender. ComfyUI runs with
+`--disable-smart-memory`, so it moves its models back to RAM when each picture or clip is
+done and the next job finds the card free; reloading them costs a second or two. Without
+that, Wan stayed on the card after a clip and ACE-Step ran out of memory loading.
+`VLLM_GPU_UTIL` and `VLLM_MAX_MODEL_LEN` change vLLM's share if a different card is used.
 
 ## Launching
 
