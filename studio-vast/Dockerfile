@@ -20,14 +20,21 @@ LABEL org.opencontainers.image.source="${SOURCE_URL}" \
 # GLSL MaterialX libraries. TeX for Manim's notation: everything lectern and cartoon typeset with,
 # except doublestroke, which comes from CTAN (193 KB rather than texlive-fonts-extra's 1.7 GB).
 # The EGL vendor file lets Blender's headless EEVEE find NVIDIA's EGL instead of falling back
-# to Mesa's software renderer.
+# to Mesa's software renderer. CTAN's own redirector picks a random mirror, and some of those
+# have broken certificates, so doublestroke comes from a fixed list of mirrors, checked by hash.
+ARG DOUBLESTROKE_SHA256=6131360ec181ff62a2fba00fb8ad0bc0dda1c628b94f304db1a7617bde35949a
 RUN set -euo pipefail && \
     apt-get update && \
     apt-get install -y --no-install-recommends libsm6 libice6 libxt6t64 libopengl0 xz-utils unzip \
         texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
         texlive-science tipa dvisvgm libcairo2-dev libpango1.0-dev pkg-config && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    curl -fsSL https://mirrors.ctan.org/install/fonts/doublestroke.tds.zip -o /tmp/doublestroke.zip && \
+    for m in https://mirrors.mit.edu/CTAN https://ctan.math.illinois.edu https://ftp.fau.de/ctan \
+             https://mirror.las.iastate.edu/tex-archive; do \
+        curl -fsSL --retry 3 "$m/install/fonts/doublestroke.tds.zip" -o /tmp/doublestroke.zip && \
+        echo "${DOUBLESTROKE_SHA256}  /tmp/doublestroke.zip" | sha256sum -c - && break; \
+        rm -f /tmp/doublestroke.zip; \
+    done && test -s /tmp/doublestroke.zip && \
     mkdir -p /usr/local/share/texmf && unzip -q /tmp/doublestroke.zip -d /usr/local/share/texmf && \
     rm /tmp/doublestroke.zip && mktexlsr && kpsewhich dsfont.sty && \
     mkdir -p /usr/share/glvnd/egl_vendor.d && \
