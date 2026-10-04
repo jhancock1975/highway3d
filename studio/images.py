@@ -1,4 +1,4 @@
-"""Pictures for the studio: cards GIMP draws, and pictures xAI paints.
+"""Pictures for the studio: cards GIMP draws, and pictures painted by Chroma1-HD on this machine's ComfyUI or by xAI.
 
 A card is text laid out on a plain ground -- title cards, lower thirds,
 signs, end slates -- drawn by GIMP with no window open. Captions are drawn
@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import shutil
 import subprocess
 import tempfile
 
-from studio import library, memory, xai
+from studio import comfy, library, memory, workflows, xai
 from studio.errors import last_line
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,6 +24,9 @@ GIMP = os.environ.get("STUDIO_GIMP",
                       "/Applications/GIMP.app/Contents/MacOS/gimp-console-3.2")
 DRAW = os.path.join(HERE, "studio", "gimp_draw.py")
 STYLES = ("dark", "light", "chalkboard", "sign")
+# Where pictures come from: "comfyui" (Chroma1-HD on this machine, the
+# vast.ai image's setting) or "xai" (xAI's paid API, the Mac's setting).
+PICTURES = os.environ.get("STUDIO_PICTURES", "xai")
 
 
 def draw(jobs: list[dict]) -> None:
@@ -91,3 +96,28 @@ def picture(prompt: str, aspect: str = "16:9", resolution: str = "2k",
     return library.add(out, "pic", source=f"xai: {xai.MODEL}", move=True,
                        prompt=prompt, aspect=aspect, resolution=resolution,
                        references=list(references))
+
+
+def paint(prompt: str, aspect: str = "16:9", count: int = 1, negative: str = "",
+          seed: int = -1, client=None) -> list[dict]:
+    """Keyframes from Chroma1-HD on this machine's ComfyUI, filed in the library as pic- ids."""
+    if not prompt.strip():
+        raise ValueError("a picture needs a prompt")
+    count = int(count)
+    if not 1 <= count <= 4:
+        raise ValueError("pictures come 1 to 4 at a time")
+    width, height = workflows.CHROMA_SIZES.get(aspect, workflows.CHROMA_SIZES["1:1"])
+    seed = random.randrange(2 ** 31) if seed is None or int(seed) < 0 else int(seed)
+    client = client or comfy.Comfy()
+    graph = workflows.chroma_t2i(prompt, width, height, count=count, seed=seed, negative=negative)
+    outputs = client.run(graph, labels=workflows.CHROMA_LABELS)
+    tmp = tempfile.mkdtemp(prefix="studio-paint-")
+    try:
+        notes = [library.add(client.download(f, tmp), "pic", source="comfyui: Chroma1-HD", move=True,
+                             prompt=prompt, aspect=aspect, seed=seed, take=i, negative=negative)
+                 for i, f in enumerate(client.files(outputs))]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    if not notes:
+        raise RuntimeError("ComfyUI finished without writing a picture")
+    return notes
