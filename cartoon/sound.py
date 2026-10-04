@@ -236,14 +236,18 @@ def _place(bus, clip, t, gain=1.0):
     bus[i:j] += clip[: j - i] * gain
 
 
-def _load(path):
+def _load(path, stereo=False):
     import soundfile as sf
     a, sr = sf.read(path, dtype="float64")
-    if a.ndim > 1:
+    if a.ndim > 1 and not stereo:
         a = a.mean(1)
+    elif a.ndim == 1 and stereo:
+        a = np.stack([a, a], 1)
     if sr != SR:
         n = int(len(a) * SR / sr)
-        a = np.interp(np.linspace(0, len(a) - 1, n), np.arange(len(a)), a)
+        x = np.linspace(0, len(a) - 1, n)
+        a = np.stack([np.interp(x, np.arange(len(a)), a[:, c]) for c in range(a.shape[1])], 1) \
+            if a.ndim > 1 else np.interp(x, np.arange(len(a)), a)
     return a
 
 
@@ -326,20 +330,21 @@ def mix(film, music_path, out_path):
     dia, duck = dialogue(film)
     fx, amb = foley(film)
     n = len(dia)
-    mus = np.zeros(n)
+    # the score is stereo; everything else sits in the middle
+    mus = np.zeros((n, 2))
     if music_path and os.path.exists(music_path):
-        m = _load(music_path)
+        m = _load(music_path, stereo=True)
         mus[: min(n, len(m))] = m[:n]
     music_gain = 0.30 * (1 - 0.72 * duck)
-    out = dia * 0.95 + fx * 0.55 + amb * 0.35 + mus * music_gain
+    centre = dia * 0.95 + fx * 0.55 + amb * 0.35
+    stereo = np.stack([centre, centre], 1) + mus * music_gain[:, None]
+    # a little width for the ambience
+    stereo[:, 0] += amb * 0.05
+    stereo[:, 1] -= amb * 0.05
     # gentle limiter
-    peak = np.abs(out).max()
+    peak = np.abs(stereo).max()
     if peak > 0.98:
-        out = np.tanh(out / peak * 1.4) / math.tanh(1.4) * 0.98
-    stereo = np.stack([out, out], 1)
-    # a little width for the music and ambience
-    stereo[:, 0] += (mus * music_gain * 0.1 + amb * 0.05)
-    stereo[:, 1] -= (mus * music_gain * 0.1 + amb * 0.05)
+        stereo = np.tanh(stereo / peak * 1.4) / math.tanh(1.4) * 0.98
     sf.write(out_path, np.clip(stereo, -1, 1), SR, subtype="PCM_24")
     return out_path
 

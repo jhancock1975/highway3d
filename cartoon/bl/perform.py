@@ -674,6 +674,26 @@ class Performer:
                 tgt[i] = MK.board_point(0.6, 0.7)
         d = tgt - pos
         yaw = np.unwrap(np.arctan2(d[:, 0], -d[:, 1]))
+        # While it licks, it turns part of the way toward the camera that
+        # watches the lick, so its mouth is seen and the tongue leaves it in
+        # plain view before curving on to the chalk. Squarely facing the
+        # board, the camera had its back, and the tongue seemed to come out
+        # from under its belly.
+        from cartoon.sets import lick as LK
+        cheat = np.zeros(n)
+        cam_yaw = np.zeros(n)
+        for b in film.beats:
+            if b["do"] not in ("lick", "slurp"):
+                continue
+            cam = LK.slurp_camera() if b["do"] == "slurp" else \
+                LK.camera(film.f["setups"]["two"], b.get("target") or "product")
+            env = np.clip(np.minimum((t - b["start"]) / 0.5, (b["end"] - t) / 0.5), 0, 1)
+            k = env > cheat
+            dc = np.array(cam["loc"])[None, :] - pos[k]
+            cam_yaw[k] = np.arctan2(dc[:, 0], -dc[:, 1])
+            cheat[k] = env[k]
+        turn = np.angle(np.exp(1j * (cam_yaw - yaw)))
+        yaw = yaw + smooth_series(0.5 * turn * cheat, fps, 0.12)
         # while moving fast, face the way it is going
         vel = np.gradient(pos, axis=0) * fps
         speed = np.linalg.norm(vel[:, :2], axis=1)
@@ -697,6 +717,24 @@ class Performer:
         fwd_acc = -acc[:, 0] * np.sin(yaw) + acc[:, 1] * np.cos(yaw)
         roll = np.clip(smooth_series(-side_acc * 0.03, fps, 0.12), -0.22, 0.22)
         pitch = np.clip(smooth_series(fwd_acc * 0.025, fps, 0.14), -0.18, 0.18)
+        # look down at what it licks: level, from above the slate, the tongue
+        # took the straight way to the chalk -- down through its own body --
+        # and showed only where it came out, under the belly or by a hand
+        look = np.zeros(n)
+        for b in film.beats:
+            if b["do"] not in ("lick", "slurp"):
+                continue
+            if b["do"] == "slurp":
+                aim = np.array(MK.board_point(0.55, 0.5))
+            else:
+                u0, u1, v, h = MK.BOARD_LAYOUT[b.get("target") or "product"]
+                aim = np.array(MK.board_point((u0 + u1) / 2, v))
+            env = np.clip(np.minimum((t - b["start"]) / 0.4, (b["end"] - t) / 0.4), 0, 1)
+            k = env > 0
+            d = aim - pos[k]
+            down = np.arctan2(-d[:, 2], np.linalg.norm(d[:, :2], axis=1))
+            look[k] = np.maximum(look[k], env[k] * np.clip(down * 0.7, 0.0, 0.65))
+        pitch = pitch + smooth_series(look, fps, 0.1)
         for i in range(3):
             self.bk.add(arm, "location", pos[:, i], index=i)
         arm.rotation_mode = "XYZ"
@@ -781,9 +819,14 @@ class Performer:
             P[:, 0] += sx * 0.008 * np.sin(TAU * t / 1.1 + sx)
             poses = {}
             for b in film.beats:
+                if b["do"] in ("lick", "slurp"):
+                    # hands back at its sides while it licks: in front, the
+                    # near one hid its mouth, and the tongue seemed to come
+                    # out from behind its hand
+                    w = pulse(t, b["start"], 0.3, max(0.1, b["end"] - b["start"] - 0.6), 0.3)
+                    P = P + np.array([sx * 0.05, 0.085, -0.03])[None, :] * w[:, None]
+                    continue
                 if not b["act"] or b["who"] != "cinnamon":
-                    if b["do"] == "slurp":
-                        pass
                     continue
                 t0, t1, a = b["start"], b["end"], b["act"]
                 w = pulse(t, t0 + 0.1, 0.3, max(0.1, t1 - t0 - 0.8), 0.4)
@@ -924,6 +967,33 @@ class Performer:
             self._tongue_jobs.append((kind, b, f0, f1))
         self._tongue_obj = tongue
 
+    def _round_body(self, pts, clear=0.012, iterations=6):
+        """Keep the tongue outside Cinnamon's own body, past the lips.
+
+        Each point that would be inside the bean is pushed out to its
+        surface, then the tongue is relaxed along its length so the push
+        leaves no kink; the root in the mouth and the tip on the chalk stay
+        where they are."""
+        cin = self.rigs.get("cinnamon")
+        if cin is None:
+            return pts
+        mw = cin.matrix_world
+        spheres = [(np.array(mw @ Vector(c)), r) for c, r in self.CINNAMON_BODY[:2]]
+        P = np.array(pts, float)
+        k = len(P)
+        start = 2               # the first points are in the mouth, where they belong
+        for _ in range(iterations):
+            for i in range(start, k - 1):
+                for c, r in spheres:
+                    d = P[i] - c
+                    n_ = np.linalg.norm(d)
+                    if n_ < r + clear:
+                        P[i] = c + d / max(n_, 1e-6) * (r + clear)
+            Q = P.copy()
+            Q[start:k - 1] = 0.5 * P[start:k - 1] + 0.25 * (P[start - 1:k - 2] + P[start + 1:k])
+            P = Q
+        return [p for p in P]
+
     def _round_euler(self, pts, clear=0.03, iterations=4):
         """Bow the tongue round Euler's head and arms, ends fixed.
 
@@ -1016,7 +1086,11 @@ class Performer:
                 # came out through the chin.
                 from cartoon.characters.cinnamon_shape import MOUTH_C
                 mx, my, mz = MOUTH_C
-                lips = np.array(M @ Vector((mx, my - 0.03, mz - 0.006)))
+                # out of the mouth forward before it turns for the chalk: a
+                # control point well in front of the lips, so the tongue is
+                # seen leaving the mouth rather than appearing out of its body
+                ahead = 0.09 if kind in ("lick", "slurp") else 0.03
+                lips = np.array(M @ Vector((mx, my - ahead, mz - 0.006)))
                 pts = []
                 nrm = np.array(MK.board_normal())
                 for i in range(TONGUE_POINTS):
@@ -1027,7 +1101,7 @@ class Performer:
                     rw = np.array(M @ Vector(rest[i]))
                     pts.append(rw * (1 - out) + q * out)
                 if kind in ("lick", "slurp"):
-                    pts = self._round_euler(pts)
+                    pts = self._round_body(self._round_euler(pts))
                 for i, p in enumerate(pts):
                     lp = Mi @ Vector(p)
                     frames_done.setdefault(i, []).append((f, lp))
@@ -1293,13 +1367,37 @@ class Performer:
             butt = chalk.matrix_world @ Vector((0, 0, 0.0325))
             return tip, butt
 
+        hand_pb = arm.pose.bones["hand.R"]
+        # which way up the hand is, once the chalk points into the slate: the
+        # fingers rise from a low wrist toward the board, leaning away from
+        # him, the back of the hand up and out -- a pen held against a wall
+        fingers_want = (up * 0.8 + away * 0.6).normalized()
+
+        def roll_to_upright(q, d_hand):
+            """Turn about the chalk's own axis until the fingers point the way
+            a hand writing on a wall points them. Aiming only the chalk left
+            the hand free to spin round it, and it hung from the wrist
+            knuckles-down, which read as an upside-down hand."""
+            ax = want_dir
+            cur = q @ d_hand
+            cur_p = (cur - ax * cur.dot(ax))
+            want_p = (fingers_want - ax * fingers_want.dot(ax))
+            if cur_p.length < 1e-4 or want_p.length < 1e-4:
+                return q
+            cur_p.normalize()
+            want_p.normalize()
+            ang = math.atan2(ax.dot(cur_p.cross(want_p)), cur_p.dot(want_p))
+            return Quaternion(ax, ang) @ q
+
         for it in range(iterations):
-            # 1. aim the chalk
+            # 1. aim the chalk, then stand the hand upright about it
             for f in frames:
                 sc.frame_set(f)
                 tip, butt = ends()
                 d = (tip - butt).normalized()
-                q = d.rotation_difference(want_dir)
+                mw = arm.matrix_world
+                d_hand = (mw @ hand_pb.tail - mw @ hand_pb.head).normalized()
+                q = roll_to_upright(d.rotation_difference(want_dir), d_hand)
                 q = Quaternion().slerp(q, float(writing[f]))
                 set_rot(f, (R_inv @ q @ R_arm @ get_rot(f)).normalized())
             update()
@@ -1347,8 +1445,14 @@ class Performer:
                 deep = float(((wc - np.array(o)) @ np.array(nrm)).min())
                 ev.to_mesh_clear()
                 behind = min(behind, deep)
+        ups = []
+        for f in on[::6]:
+            sc.frame_set(f)
+            mw = arm.matrix_world
+            ups.append((mw @ hand_pb.tail - mw @ hand_pb.head).normalized().dot(up))
         C.log(f"chalk on the slate: {len(on)} frames touching, worst miss {miss * 1000:.1f} mm, "
-              f"deepest hand point {behind * 1000:.1f} mm behind the slate")
+              f"deepest hand point {behind * 1000:.1f} mm behind the slate, "
+              f"fingers rising {min(ups, default=0):+.2f}..{max(ups, default=0):+.2f} (up is +1)")
 
     # ------------------------------------------------------------ run
     def run(self):

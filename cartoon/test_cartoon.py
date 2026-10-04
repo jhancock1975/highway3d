@@ -277,11 +277,25 @@ def test_no_cross_side_weights():
         "        n = names[g.group]\n"
         "        if g.weight > 0.05 and abs(x) > 0.08 and ((x > 0 and n.endswith('.R')) or (x < 0 and n.endswith('.L'))):\n"
         "            bad += 1\n"
-        "print('CROSS', bad)\n")
+        "print('CROSS', bad)\n"
+        "import sys; sys.path.insert(0, %r)\n"
+        "from cartoon.characters import cinnamon_shape as X\n"
+        "import numpy as np\n"
+        "far = 0\n"
+        "for v in ob.data.vertices:\n"
+        "    for g in v.groups:\n"
+        "        n = names[g.group]\n"
+        "        if g.weight > 0.05 and n.split('.')[0] in ('foot', 'hand', 'forearm') and n in X.J:\n"
+        "            if np.linalg.norm(np.array(v.co) - np.array(X.J[n])) > 0.16:\n"
+        "                far += 1\n"
+        "print('FAR', far)\n" % HERE)
     r = subprocess.run(["blender", "-b", blend, "--python-expr", code], capture_output=True, text=True)
     line = [l for l in r.stdout.splitlines() if l.startswith("CROSS")]
     n = int(line[0].split()[1]) if line else -1
     check("no vertex follows a bone on the other side", n == 0, n)
+    line = [l for l in r.stdout.splitlines() if l.startswith("FAR")]
+    far = int(line[0].split()[1]) if line else -1
+    check("no vertex follows a hand or foot it is nowhere near", far == 0, far)
 
 
 def test_tables_agree():

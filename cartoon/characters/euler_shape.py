@@ -111,8 +111,11 @@ def head():
         S.blend(Capsule((0, -0.096, 0.072), (0, -0.146, 0.0), 0.0105, 0.0165,
                         color=SKIN, label="nose"), 0.014),
         S.blend(Sphere((0, -0.151, -0.005), 0.021, color=NOSE, label="nose"), 0.012),
-        S.blend(Ellipsoid((0.019, -0.13, -0.012), (0.014, 0.015, 0.012), color=NOSE,
-                          label="nose", mirror=True), 0.009),
+        # the wings flare out of the tip rather than sitting beside it: as
+        # separate balls, tightly blended, from below either one read as a
+        # second nose tip with a nostril of its own
+        S.blend(Ellipsoid((0.0155, -0.137, -0.013), (0.0115, 0.012, 0.0085), color=NOSE,
+                          label="nose", mirror=True), 0.017),
         # ears
         S.blend(Ellipsoid((0.099, 0.004, 0.012), (0.017, 0.03, 0.045), R=rot(0, -10, -14),
                           color=NOSE, label="ear", mirror=True), 0.01),
@@ -134,7 +137,9 @@ def head():
 
     # smile lines, deep: he smiles a great deal
     for sx in (1, -1):
-        crease = Warp(Capsule((sx * 0.026, -0.131, -0.012), (sx * 0.044, -0.116, -0.072),
+        # starting beside the nose's wing, not in it: cut into the wing, the
+        # crease left a dark slit there that looked like an extra nostril
+        crease = Warp(Capsule((sx * 0.030, -0.131, -0.017), (sx * 0.044, -0.116, -0.072),
                               0.0021, 0.0015, color=SKIN, label="crease"),
                       lambda P, sx=sx: np.stack([sx * 0.004 * np.sin((P[:, 2] + 0.012) * 40),
                                                  0 * P[:, 0], 0 * P[:, 0]], 1))

@@ -422,7 +422,7 @@ def _job_of(log: str) -> str:
 
 def _live_jobs() -> set[str]:
     """Jobs whose build is still running, whichever server started them."""
-    r = subprocess.run(["ps", "-axww", "-o", "args="],
+    r = subprocess.run(["ps", "-A", "-ww", "-o", "args="],
                        capture_output=True, text=True)
     return set(re.findall(r"lectern\.build .*--job (\w+)", r.stdout))
 

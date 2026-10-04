@@ -33,29 +33,16 @@ def clear():
 
 
 def _enable_gpu() -> str:
-    """Turn the Metal GPU on, and say which device Cycles will actually use.
+    """Turn the best GPU on (Metal on the Mac, OptiX or CUDA on NVIDIA), and say whether Cycles will use one.
 
     `cycles.devices` is empty until the preferences are refreshed, so setting
     `scene.cycles.device = "GPU"` on a fresh --factory-startup silently renders
     on the CPU instead: the first measurement here came out at 7s a frame,
     which over a 24-minute lecture is six days rather than one night.
     """
-    addon = bpy.context.preferences.addons.get("cycles")
-    if addon is None:
-        return "CPU"
-    prefs = addon.preferences
     try:
-        prefs.compute_device_type = "METAL"
-        for attr in ("get_devices", "refresh_devices"):
-            if hasattr(prefs, attr):
-                getattr(prefs, attr)()
-        gpus = [d for d in prefs.devices if d.type == "METAL"]
-        if not gpus:
-            return "CPU"
-        for d in prefs.devices:
-            d.use = (d.type == "METAL")
-        print("cycles device:", ", ".join(d.name for d in gpus), flush=True)
-        return "GPU"
+        import blender_gpu
+        return "CPU" if blender_gpu.enable(bpy) == "CPU" else "GPU"
     except Exception as e:
         print("no GPU, falling back to CPU:", e, flush=True)
         return "CPU"

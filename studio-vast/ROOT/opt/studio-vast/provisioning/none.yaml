@@ -1,0 +1,6 @@
+# No model downloads (CI). The ComfyUI extension stays so workflow discovery still runs.
+version: 1
+extensions:
+  - module: provisioner_comfyui
+    config:
+      comfyui_dir: "${WORKSPACE:-/workspace}/ComfyUI"

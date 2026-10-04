@@ -25,8 +25,8 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 from forgiving import ForgivingServer  # noqa: E402
-from studio import (assemble, images, jobs, library, memory, music,  # noqa: E402
-                    speech, timeline, xai)
+from studio import (assemble, compose, images, jobs, library, memory,  # noqa: E402
+                    music, speech, timeline, xai)
 
 RENDERS = os.environ.get("STUDIO_RENDERS", os.path.join(HERE, "renders"))
 
@@ -40,7 +40,9 @@ mcp = ForgivingServer(
         "studio_import brings in footage, pictures and sound by path or URL. "
         "Each returns an id. studio_assemble cuts ids together into an mp4 "
         "(or an m4a with no video) as a job, and studio_status says how it "
-        "is going. studio_describe has the full edit format and an example."
+        "is going. studio_animate turns a picture into a clip, studio_extend "
+        "carries a clip on, and studio_compose writes music; those are jobs too. "
+        "studio_describe has the full edit format and an example."
     ),
 )
 
@@ -86,8 +88,15 @@ def studio_describe() -> str:
         "einstein (the lecture professor's German-accented voice).",
         f"MOODS (studio_music): {', '.join(music.MOODS)}.",
         f"CARD STYLES (studio_card): {', '.join(images.STYLES)}.",
-        f"PICTURES (studio_picture, xAI {xai.MODEL}): aspect {', '.join(xai.ASPECTS)}; "
-        f"resolution {', '.join(xai.RESOLUTIONS)}; up to 5 reference pictures.",
+        (f"PICTURES (studio_picture, Chroma1-HD on this machine): aspect {', '.join(xai.ASPECTS)}; "
+         f"1 to 4 takes at a time; a negative prompt; a seed to repeat a take."
+         if images.PICTURES == "comfyui" else
+         f"PICTURES (studio_picture, xAI {xai.MODEL}): aspect {', '.join(xai.ASPECTS)}; "
+         f"resolution {', '.join(xai.RESOLUTIONS)}; up to 5 reference pictures."),
+        "ANIMATION (studio_animate, studio_extend): Wan 2.2 image-to-video, 1-5 seconds a call at 16 fps, "
+        "draft 480p or final 720p; studio_extend carries a clip on from its last frame. Both are jobs.",
+        "COMPOSED MUSIC (studio_compose): ACE-Step 1.5 from a description, 10-600 seconds, instrumental "
+        "unless lyrics are given; a job.",
         "",
         "EDIT FORMAT (studio_assemble):",
         "  size WxH (default 1920x1080), fps (default 30), name.",
@@ -162,13 +171,21 @@ def studio_card(
 
 @mcp.tool()
 def studio_picture(
-    prompt: Annotated[str, Field(description="What the picture shows.")],
+    prompt: Annotated[str, Field(description="What the picture shows: subject, setting, light, lens, style.")],
     aspect: Annotated[Literal[xai.ASPECTS], Field(description="Shape of the picture.")] = "16:9",
-    resolution: Annotated[Literal[xai.RESOLUTIONS], Field(description="Detail.")] = "2k",
-    references: Annotated[list[str], Field(description="Up to 5 picture ids to work from.")] = [],
+    resolution: Annotated[Literal[xai.RESOLUTIONS], Field(description="Detail, for xAI pictures only.")] = "2k",
+    references: Annotated[list[str], Field(description="Up to 5 picture ids to work from (xAI only).")] = [],
+    count: Annotated[int, Field(ge=1, le=4, description="How many takes to paint at once, 1 to 4.")] = 1,
+    negative: Annotated[str, Field(description="What to keep out of the picture (Chroma only).")] = "",
+    seed: Annotated[int, Field(description="-1 for new random takes; a number repeats a take.")] = -1,
 ) -> str:
-    """Paint a picture from a description with xAI's image model, paid from prepaid credit. aspect is 16:9 (the default), 9:16, 1:1, 4:3, 3:4, 3:2, 2:3, 21:9 or auto; resolution is 1k, 1.5k or 2k (the default); references are up to 5 picture ids to repaint or work from, such as a card laid out in GIMP."""
+    """Paint pictures from a description, filed in the library as pic- ids. On a machine with STUDIO_PICTURES=comfyui (the vast.ai studio) they come from Chroma1-HD, an uncensored open model, 1 to 4 takes at a time, about a megapixel each; elsewhere from xAI's image model, paid from prepaid credit, one at a time with up to 5 reference pictures. aspect is 16:9 (the default), 9:16, 1:1, 4:3, 3:4, 3:2, 2:3, 21:9 or auto; resolution is 1k, 1.5k or 2k (the default). Keyframes made here can be animated with studio_animate."""
     try:
+        if images.PICTURES == "comfyui":
+            if references:
+                return "No picture was made: reference pictures need xAI; Chroma paints from the description alone."
+            notes = images.paint(prompt, aspect, count, negative, seed)
+            return "\n".join(library.said(n) for n in notes) + "\nShow them with show; animate one with studio_animate."
         return library.said(images.picture(prompt, aspect, resolution, references)) + "."
     except Exception as e:
         return f"No picture was made: {_sentence(e)}"
@@ -214,12 +231,87 @@ def studio_assemble(
             f"is going whenever it is asked, with or without the job id.")
 
 
+def _need(ref: str, kind: str, tool: str) -> str:
+    """'' if ref is a library asset of this kind, else why not, as a sentence."""
+    try:
+        note = library.get(ref.strip())
+    except KeyError as e:
+        return f"Not starting: {_sentence(e)}"
+    if note["kind"] != kind:
+        return f"Not starting: {ref} is a {note['kind']}, not a {'picture' if kind == 'image' else 'clip'}; use {tool}."
+    return ""
+
+
+@mcp.tool()
+def studio_animate(
+    picture: Annotated[str, Field(description="The picture's id, such as pic-3f2a.")],
+    prompt: Annotated[str, Field(description="What moves and how: the action, then the camera.")],
+    seconds: Annotated[int, Field(ge=1, le=5, description="Length, 1 to 5 seconds.")] = 5,
+    quality: Annotated[Literal["draft", "final"], Field(description="draft is 480p and quicker; final is 720p.")] = "draft",
+    seed: Annotated[int, Field(description="-1 for a new random take; a number repeats one.")] = -1,
+) -> str:
+    """Animate a picture from the library into a silent clip of up to 5 seconds at 16 frames a second, with Wan 2.2 image-to-video (the uncensored Remix merge). Starts a job and returns at once with its id; follow it with watch_job in the chat, or studio_status. The clip is filed as a clip- id; studio_extend carries it on."""
+    refused = _need(picture, "image", "studio_extend to carry a clip on")
+    if refused:
+        return refused
+    job = jobs.new()
+    jobs.start(job, "studio.motion", ["animate", "--picture", picture.strip(), "--prompt", prompt,
+                                      "--seconds", str(seconds), "--quality", quality, "--seed", str(seed)],
+               dict(name=f"animate {picture.strip()}"))
+    return (f"Started animating {picture.strip()} as job {job}: {seconds} seconds at {quality} quality, "
+            f"usually a minute or two (the first run of a session also loads the models). "
+            f"Call watch_job with {job} to show its progress and the clip.")
+
+
+@mcp.tool()
+def studio_extend(
+    clip: Annotated[str, Field(description="The clip's id, such as clip-9c01.")],
+    prompt: Annotated[str, Field(description="What happens next: the action, then the camera.")],
+    seconds: Annotated[int, Field(ge=1, le=5, description="How much to add, 1 to 5 seconds.")] = 5,
+    quality: Annotated[Literal["match", "draft", "final"],
+                       Field(description="match keeps the clip's own quality; draft is 480p; final is 720p.")] = "match",
+    seed: Annotated[int, Field(description="-1 for a new random take.")] = -1,
+) -> str:
+    """Carry a clip on: animate its last frame for up to 5 more seconds and join the two into one longer clip, filed as a new clip- id (the original stays). Repeat to build long shots. Starts a job and returns at once; follow it with watch_job."""
+    refused = _need(clip, "video", "studio_animate to start from a picture")
+    if refused:
+        return refused
+    job = jobs.new()
+    args = ["extend", "--clip", clip.strip(), "--prompt", prompt, "--seconds", str(seconds), "--seed", str(seed)]
+    if quality != "match":
+        args += ["--quality", quality]
+    jobs.start(job, "studio.motion", args, dict(name=f"extend {clip.strip()}"))
+    return (f"Started extending {clip.strip()} by {seconds} seconds as job {job}. "
+            f"Call watch_job with {job} to show its progress and the longer clip.")
+
+
+@mcp.tool()
+def studio_compose(
+    description: Annotated[str, Field(description="The music: instruments, mood, tempo, genre.")],
+    seconds: Annotated[float, Field(ge=10, le=600, description="Length, 10 to 600 seconds.")] = 30,
+    lyrics: Annotated[str, Field(description="Words to sing, with [verse]/[chorus] tags; empty for instrumental.")] = "",
+    seed: Annotated[int, Field(description="-1 for a new random take.")] = -1,
+) -> str:
+    """Compose a music cue from a description with ACE-Step 1.5, instrumental unless lyrics are given, 10 seconds to 10 minutes. Starts a job and returns at once; follow it with watch_job. The cue is filed as a music- id for studio_assemble. For a quick procedural bed from a mood instead, use studio_music."""
+    try:
+        compose.params(description, seconds, lyrics, seed)
+    except ValueError as e:
+        return f"Not starting: {_sentence(e)}"
+    job = jobs.new()
+    args = ["--description", description, "--seconds", str(seconds), "--seed", str(seed)]
+    if lyrics.strip():
+        args += ["--lyrics", lyrics]
+    jobs.start(job, "studio.compose", args, dict(name="compose music"), python=compose.PYTHON)
+    return (f"Started composing {seconds:.0f} seconds of music as job {job}; about a minute. "
+            f"Call watch_job with {job} to show its progress and play the cue.")
+
+
 @mcp.tool()
 def studio_status(
-    job: Annotated[str, Field(description="The job id studio_assemble gave. "
+    job: Annotated[str, Field(description="The job id a studio tool gave. "
                                           "Leave it out for the most recent.")] = "",
 ) -> str:
-    """How an assembly is going, or how it finished. With no job id, the most recent one, and any others still running."""
+    """How a job is going, or how it finished: an animation, an extension, a composed cue or an assembly. With no job id, the most recent one, and any others still running."""
     return jobs.status(job)
 
 

@@ -4,6 +4,7 @@
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -39,7 +40,9 @@ LONG_SOUND = make("long sound.mp4", "-f", "lavfi", "-i", "testsrc2=size=160x120:
 ROTATED = make("rotated.mp4", "-display_rotation", "90", "-i", SILENT, "-c", "copy")
 ONE_FRAME = make("one frame.mp4", "-f", "lavfi", "-i", "testsrc2=size=320x200", "-frames:v", "1")
 HEIC = os.path.join(SRC, "photo.heic")
-subprocess.run(["sips", "-s", "format", "heic", STILL, "--out", HEIC], check=True, capture_output=True)
+HAVE_SIPS = shutil.which("sips") is not None      # macOS only; Linux has no HEIC maker
+if HAVE_SIPS:
+    subprocess.run(["sips", "-s", "format", "heic", STILL, "--out", HEIC], check=True, capture_output=True)
 
 
 def test_probe_tells_kinds_apart():
@@ -63,6 +66,8 @@ def test_rotation_gives_the_upright_size():
 
 
 def test_iphone_photos_import_as_pictures():
+    if not HAVE_SIPS:
+        return
     note = L.import_(HEIC)
     assert note["id"].startswith("image-") and note["kind"] == "image", note
     assert (note["width"], note["height"]) == (640, 360), note

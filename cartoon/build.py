@@ -7,7 +7,7 @@ Steps, each cached so a rerun does only what changed:
 
   1. speak      every line, measured (Kokoro, .ttsvenv)
   2. time       film.json: timing, blocking, slate events, shots
-  3. score      MusicGen cues (.ttsvenv) -- before any render, never during one
+  3. score      ACE-Step cues (lectern/.musicvenv) -- before any render, never during one
   4. typeset    the slate's formulas (Manim, lectern/.manimvenv)
   5. prepare    characters and sets, as .blend files
   6. render     every shot, frame by frame (Blender); frames already on disk
@@ -36,6 +36,7 @@ import fonts  # noqa: E402
 from cartoon import assemble, chalk, script, sound, timeline  # noqa: E402
 
 TTS = os.path.join(ROOT, ".ttsvenv", "bin", "python")
+MUSIC = os.path.join(ROOT, "lectern", ".musicvenv", "bin", "python")   # ACE-Step 1.5
 BLENDER = os.environ.get("BLENDER", "blender")
 ASSETS = os.path.join(ROOT, ".work", "cartoon", "assets")
 SETS = os.path.join(ROOT, ".work", "cartoon", "sets")
@@ -164,14 +165,17 @@ def build(script_path, out, work=None, engine="BLENDER_EEVEE", samples=96, res="
         music_wav = os.path.join(work, "music.wav")
         if music and not os.path.exists(music_wav):
             st.set(step="score")
-            # MusicGen must not load beside a render (the 2026-09-26 panic)
+            # ACE-Step must not load beside a render (the 2026-09-26 panic)
             while subprocess.run(["pgrep", "-x", "blender"], capture_output=True).returncode == 0:
                 st.set(step="score (waiting for other renders to finish)")
                 time.sleep(60)
             st.set(step="score")
-            st.log("scoring (MusicGen; nothing else runs meanwhile)")
-            _run([TTS, "-m", "cartoon.score", "--film", os.path.join(work, "film.json"), "--out", music_wav],
-                 log, cwd=ROOT)
+            from studio import gpu      # ACE-Step's ~14 GB, not beside the studio's Wan or its own music
+            with gpu.hold(on_wait=lambda why: st.set(step=f"score ({why})")):
+                st.set(step="score")
+                st.log("scoring (ACE-Step; nothing else runs meanwhile)")
+                _run([MUSIC, "-m", "cartoon.score", "--film", os.path.join(work, "film.json"), "--out", music_wav],
+                     log, cwd=ROOT)
         st.set(step="typeset")
         from cartoon.sets import marks as MK
         pngs = chalk.typeset(dict(doc.get("boards") or {}, **MK.GHOSTS), os.path.join(work, "chalk"))

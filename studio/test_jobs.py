@@ -98,6 +98,29 @@ def test_start_writes_header_and_runs():
     assert first.startswith("JOB ") and json.loads(first[4:])["name"] == "probe", first
 
 
+def test_a_finished_job_names_what_it_made():
+    job = "aa11bb"
+    log = os.path.join(J.WORK, f"job-{job}.log")
+    with open(log, "w") as fh:
+        fh.write('JOB {"name": "animate pic-1a2b"}\n')
+        fh.write('DONE {"out": "/m/out.mp4", "seconds": 5.1, "bytes": 2000000, "took": 70, "asset": "clip-9c01"}\n')
+    said = J.status(job)
+    assert "clip-9c01" in said and "finished" in said, said
+
+
+
+def test_a_failure_over_several_lines_still_names_the_file():
+    from studio import errors
+    clear()
+    path = os.path.join(J.WORK, "job-f00d01.log")
+    with open(path, "w") as fh:
+        fh.write('JOB {"name": "animate pic-1a2b"}\nPROGRESS {"stage": "loading"}\n 50%|#####     ')
+        fh.write(errors.failed(RuntimeError("UNETLoader failed: Error while deserializing header\n"
+                                            "File path: /workspace/models/x.safetensors\n")) + "\n")
+    said = J.status("f00d01")
+    assert "stopped" in said and "x.safetensors" in said, said
+
+
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     bad = 0

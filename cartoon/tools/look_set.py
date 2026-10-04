@@ -33,9 +33,7 @@ sc.render.engine = a.engine
 sc.view_settings.view_transform = "AgX"; sc.view_settings.look = "AgX - Medium High Contrast"
 if a.engine == "CYCLES":
     sc.cycles.device = "GPU"; sc.cycles.samples = a.samples; sc.cycles.use_denoising = True
-    prefs = bpy.context.preferences.addons["cycles"].preferences
-    prefs.compute_device_type = "METAL"; prefs.refresh_devices()
-    for d in prefs.devices: d.use = True
+    import blender_gpu; blender_gpu.enable(bpy)
 else:
     sc.eevee.taa_render_samples = a.samples; sc.eevee.use_raytracing = True
     sc.eevee.use_shadows = True

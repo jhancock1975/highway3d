@@ -143,7 +143,7 @@ def mouth_keys(P, mouth_c, half_w, lip_upper, lip_lower, cheeks, smile_lift=0.00
     return K
 
 
-def open_key(P, mouth_c, half_w, smile_lift=0.0075, drop=0.02, sigma=0.04):
+def open_key(P, mouth_c, half_w, smile_lift=0.0075, drop=0.02, sigma=0.04, sigma_down=None):
     """Open the mouth by lowering the lower lip and chin, not by hinging a jaw.
 
     For a creature whose face is all muzzle, a jaw bone turning about a pivot
@@ -163,7 +163,13 @@ def open_key(P, mouth_c, half_w, smile_lift=0.0075, drop=0.02, sigma=0.04):
     # with hard side edges and showed as a pale strip down the chest
     lower = np.maximum(_ss(-1.0, 1.0, -v / band), _ss(-0.003, -0.018, v))
     lo = np.array([mx, my, mz - 0.01])
-    g = np.exp(-np.sum(((P - lo) / np.array((sigma * 1.4, sigma * 1.6, sigma))) ** 2, 1))
+    # Below the mouth the fall-off is slower than above it. Falling off as
+    # fast as it rises, the drop squeezed the skin under the chin to a third
+    # of its length on a wide-open mouth, and it folded into a V across the
+    # chest; spread over twice the distance, it stretches instead.
+    sz = np.where(P[:, 2] < lo[2], sigma_down or sigma, sigma)
+    rel = (P - lo) / np.stack([np.full(len(P), sigma * 1.4), np.full(len(P), sigma * 1.6), sz], 1)
+    g = np.exp(-np.sum(rel ** 2, 1))
     w = lower * g
     d = np.zeros_like(P)
     d[:, 2] = -drop * w

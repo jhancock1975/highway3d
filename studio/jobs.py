@@ -25,14 +25,16 @@ def new() -> str:
     return uuid.uuid4().hex[:6]
 
 
-def start(job: str, module: str, args: list[str], header: dict) -> str:
-    """Run `python -m module *args --job job` detached. Returns its log."""
+def start(job: str, module: str, args: list[str], header: dict,
+          python: str | None = None) -> str:
+    """Run `python -m module *args --job job` detached, under `python` (this
+    server's own interpreter unless given). Returns its log."""
     os.makedirs(WORK, exist_ok=True)
     log = os.path.join(WORK, f"job-{job}.log")
     with open(log, "w") as fh:
         fh.write("JOB " + json.dumps(header) + "\n")
         fh.flush()
-        subprocess.Popen([sys.executable, "-m", module, *args, "--job", job],
+        subprocess.Popen([python or sys.executable, "-m", module, *args, "--job", job],
                          cwd=HERE, stdout=fh, stderr=subprocess.STDOUT,
                          start_new_session=True)
     return log
@@ -40,7 +42,7 @@ def start(job: str, module: str, args: list[str], header: dict) -> str:
 
 def live() -> set[str]:
     """Jobs whose process is still running, whichever server started them."""
-    r = subprocess.run(["ps", "-axww", "-o", "args="], capture_output=True,
+    r = subprocess.run(["ps", "-A", "-ww", "-o", "args="], capture_output=True,
                        text=True)
     return set(re.findall(r"-m studio\.\w+ .*--job (\w+)", r.stdout))
 
@@ -64,7 +66,8 @@ def _report(job: str, log: str, running: set[str]) -> str:
     name = f"Job {job} ('{head['name']}')" if head.get("name") else f"Job {job}"
     if tail.startswith("DONE"):
         d = json.loads(tail[4:])
-        return (f"{name}: finished: {d['out']}, {d['seconds']:.1f} seconds "
+        what = f"{d['asset']} ({d['out']})" if d.get("asset") else d["out"]
+        return (f"{name}: finished: {what}, {d['seconds']:.1f} seconds "
                 f"long, {d['bytes'] / 1e6:.1f} MB, took {d['took']:.0f} "
                 f"seconds.")
     if tail.startswith("FAILED"):
@@ -72,8 +75,8 @@ def _report(job: str, log: str, running: set[str]) -> str:
     if job not in running:
         return (f"{name}: stopped before it finished, without saying why: its "
                 f"process is no longer running, most likely because the "
-                f"server or the Mac restarted under it. Assembling the same "
-                f"edit again starts it over.")
+                f"machine restarted under it. Starting the same work again "
+                f"starts it over.")
     if tail.startswith("PROGRESS"):
         d = json.loads(tail[8:])
         done = f", {d['percent']:.0f}% done" if "percent" in d else ""

@@ -1,0 +1,22 @@
+# Paths and settings every studio program shares. Sourced, never run.
+export STUDIO_ROOT=/opt/highway3d
+export STUDIO_WEBUI=${WORKSPACE:-/workspace}/studio-webui
+export DATA_DIR=$STUDIO_WEBUI/data
+export STATIC_DIR=$STUDIO_WEBUI/static
+export STUDIO_MEDIA=$STATIC_DIR/studio/media
+export STUDIO_RENDERS=$STATIC_DIR/studio/renders
+export LECTERN_RENDERS=$STUDIO_RENDERS
+export HIGHWAY_OUT_DIR=$STUDIO_RENDERS
+export STUDIO_WORK=${WORKSPACE:-/workspace}/studio/work
+export STUDIO_PICTURES=comfyui
+export STUDIO_COMFY=http://127.0.0.1:18188
+export STUDIO_GIMP=/opt/gimp/AppRun-console
+export BLENDER=/usr/local/bin/blender
+export LECTERN_BLENDER=/usr/local/bin/blender
+export ACE_HOME=${WORKSPACE:-/workspace}/models/ace-step
+export STUDIO_LLM_DIR=${WORKSPACE:-/workspace}/models/llm/qwen3.8-27b-abliterated
+export STUDIO_LLM_NAME=studio-llm
+export STUDIO_OWUI_DIR=/opt/studio-vast/owui
+export LECTERN_LLM_URL=http://127.0.0.1:18000/v1
+export LECTERN_LLM_MODEL=studio-llm
+export LECTERN_LLM_KEY=local

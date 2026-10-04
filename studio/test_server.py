@@ -14,11 +14,14 @@ sys.path.insert(0, os.path.dirname(HERE))
 os.environ["STUDIO_MEDIA"] = tempfile.mkdtemp(prefix="studio-media-")
 os.environ["STUDIO_WORK"] = tempfile.mkdtemp(prefix="studio-work-")
 os.environ.pop("XAI_API_KEY", None)
+os.environ["STUDIO_COMFY"] = "http://127.0.0.1:9"      # nothing listens: jobs fail fast
+os.environ["STUDIO_PICTURES"] = "xai"
 import anyio  # noqa: E402
 from studio import mcp_server as S  # noqa: E402
 
 TOOLS = {"studio_describe", "studio_import", "studio_speak", "studio_music", "studio_card",
-         "studio_picture", "studio_assemble", "studio_status", "studio_list"}
+         "studio_picture", "studio_assemble", "studio_status", "studio_list",
+         "studio_animate", "studio_extend", "studio_compose"}
 
 
 def call(name, **args):
@@ -26,7 +29,7 @@ def call(name, **args):
     return r.content[0].text
 
 
-def test_nine_tools_every_one_prefixed():
+def test_every_tool_prefixed():
     names = {t.name for t in anyio.run(S.mcp.list_tools)}
     assert names == TOOLS, names
 
@@ -88,6 +91,74 @@ def test_bad_values_are_mended_not_refused():
     got = call("studio_music", mood="jazz", seconds=2)
     assert got.startswith("mood 'jazz' is not one of drive, open, night, so it is drive."), got
     assert "music-" in got, got
+
+
+import json  # noqa: E402
+import subprocess  # noqa: E402
+import time  # noqa: E402
+from studio import library  # noqa: E402
+
+
+import contextlib  # noqa: E402
+from studio import jobs as J  # noqa: E402
+
+
+@contextlib.contextmanager
+def apart():
+    """A fresh library and job folder, so these tests leave the shared ones as the others expect."""
+    saved = (library.MEDIA, J.WORK, os.environ["STUDIO_MEDIA"], os.environ["STUDIO_WORK"])
+    library.MEDIA = os.environ["STUDIO_MEDIA"] = tempfile.mkdtemp(prefix="studio-media-")
+    J.WORK = os.environ["STUDIO_WORK"] = tempfile.mkdtemp(prefix="studio-work-")
+    try:
+        yield
+    finally:
+        library.MEDIA, J.WORK, os.environ["STUDIO_MEDIA"], os.environ["STUDIO_WORK"] = saved
+
+
+def a_picture():
+    d = tempfile.mkdtemp()
+    p = os.path.join(d, "f.png")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x360",
+                    "-frames:v", "1", p], check=True)
+    return library.add(p, "pic")
+
+
+def test_animate_refuses_what_is_not_a_picture():
+    said = call("studio_animate", picture="clip-zzzz", prompt="x")
+    assert "clip-zzzz" in said and "Not starting" in said, said
+
+
+def test_animate_starts_a_job_that_reports_comfyui_missing():
+    with apart():
+        pic = a_picture()
+        said = call("studio_animate", picture=pic["id"], prompt="she turns away", seconds=3)
+        assert "job" in said and "watch_job" in said, said
+        job = said.split(" as job ")[1].split(":")[0]
+        for _ in range(60):
+            status = call("studio_status", job=job)
+            if "stopped" in status or "finished" in status:
+                break
+            time.sleep(0.5)
+        assert "not answering" in status, status
+
+
+def test_extend_refuses_a_picture():
+    with apart():
+        pic = a_picture()
+        said = call("studio_extend", clip=pic["id"], prompt="x")
+        assert "studio_animate" in said, said
+
+
+def test_compose_refuses_an_empty_description():
+    said = call("studio_compose", description="  ", seconds=20)
+    assert "description" in said, said
+
+
+def test_descriptions_mention_the_new_engines():
+    tools = {t.name: t.description for t in anyio.run(S.mcp.list_tools)}
+    assert "Wan" in tools["studio_animate"] and "5 seconds" in tools["studio_animate"]
+    assert "last frame" in tools["studio_extend"]
+    assert "ACE-Step" in tools["studio_compose"]
 
 
 def main():
