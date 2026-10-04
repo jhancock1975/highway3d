@@ -1,0 +1,8 @@
+# No model downloads: the UIs come up empty. Still runs vast's ComfyUI provisioning
+# extension, so PROVISIONING_COMFYUI_WORKFLOWS and PROVISIONING_DOWNLOADS keep working.
+version: 1
+
+extensions:
+  - module: provisioner_comfyui
+    config:
+      comfyui_dir: "${WORKSPACE:-/workspace}/ComfyUI"

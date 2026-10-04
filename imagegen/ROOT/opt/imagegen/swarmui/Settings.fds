@@ -1,0 +1,34 @@
+# SwarmUI server settings, written ahead of time so SwarmUI skips its install wizard.
+# Copied to /workspace/SwarmUI/Data/Settings.fds on first boot; SwarmUI fills in every
+# setting not listed here with its own default and rewrites the file.
+IsInstalled: true
+InstallDate: 2026-10-03
+InstallVersion: 0.9.8.3
+LaunchMode: none
+Paths:
+    # Read models straight out of ComfyUI's folders so both UIs share one copy.
+    # diffusion_models and unet are always scanned in addition to SDModelFolder.
+    ModelRoot: /workspace/ComfyUI/models
+    SDModelFolder: checkpoints
+    SDLoraFolder: loras
+    SDVAEFolder: vae
+    SDEmbeddingFolder: embeddings
+    SDControlNetsFolder: controlnet;model_patches
+    SDClipFolder: text_encoders;clip
+    SDClipVisionFolder: clip_vision
+    OutputPath: /workspace/SwarmUI/Output
+Metadata:
+    # Editing a model's metadata writes a small .swarm.json beside it instead of
+    # rewriting a 25 GB model file.
+    EditMetadataWriteJSON: true
+    # Skip hashing each 18-26 GB model on its first use just to stamp the hash into
+    # image metadata.
+    ImageMetadataIncludeModelHash: false
+Network:
+    # Only Caddy (the Instance Portal proxy) talks to SwarmUI; it adds TLS and the login.
+    Host: 127.0.0.1
+    Port: 17801
+    PortCanChange: false
+Maintenance:
+    # Stay on the SwarmUI commit the image was built and tested with.
+    CheckForUpdates: false

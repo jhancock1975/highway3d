@@ -1,0 +1,5 @@
+# imagegen-vast — image identity (overrides the ComfyUI derivative's block).
+image:
+  name: SwarmUI + ComfyUI (Kroma v0.3 turbo, Chroma1-HD)
+  readme: https://github.com/jhancock1975/highway3d/tree/main/imagegen
+  preinstalled: PyTorch + ComfyUI + SwarmUI
