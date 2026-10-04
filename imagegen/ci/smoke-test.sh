@@ -89,7 +89,10 @@ if docker exec "$NAME" test -e /.provisioning_complete && ! docker exec "$NAME" 
 else
     fail "provisioner did not report success"
 fi
-if docker logs "$NAME" 2>&1 | grep -q 'Provisioning instance with manifest from /opt/imagegen/provisioning/none.yaml'; then
+# (saved to a file first: grep -q on a live pipe can close it early, and pipefail
+# would then count docker's SIGPIPE as a miss)
+docker logs "$NAME" > "$OUT/boot.log" 2>&1
+if grep -q 'Provisioning instance with manifest from /opt/imagegen/provisioning/none.yaml' "$OUT/boot.log"; then
     pass "IMAGEGEN_MODELS=none made the provisioner use none.yaml"
 else
     fail "IMAGEGEN_MODELS=none did not select none.yaml"
