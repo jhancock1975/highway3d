@@ -124,6 +124,15 @@ RUN set -euo pipefail && mkdir -p /opt/highway3d/studio /opt/highway3d/cartoon /
     lectern/.manimvenv/bin/python -c "import manim; print('MANIM_OK', manim.__version__)" && \
     rm -f /tmp/torch-pins.txt
 
+# cuRAND's headers, which vast's slim CUDA base leaves out: FlashInfer, vLLM's sampler, compiles
+# its sampling kernel on first start and includes curand.h. Without them vLLM loads the model
+# and then dies.
+RUN set -euo pipefail && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends libcurand-dev-12-9 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    test -f /usr/local/cuda/include/curand.h
+
 COPY . /opt/highway3d
 COPY studio-vast/ROOT/ /
 

@@ -18,10 +18,12 @@ if [ ! -f "$STUDIO_LLM_DIR/.complete" ]; then
     sleep 6
     exit 0
 fi
-export VLLM_NO_USAGE_STATS=1 DO_NOT_TRACK=1
-pty /opt/vllm/bin/vllm serve "$STUDIO_LLM_DIR" --served-model-name "$STUDIO_LLM_NAME" \
+export VLLM_NO_USAGE_STATS=1 DO_NOT_TRACK=1 PYTHONUNBUFFERED=1
+# No pty wrapper: it reported a crashed vLLM as a clean exit, so supervisor never restarted it.
+/opt/vllm/bin/vllm serve "$STUDIO_LLM_DIR" --served-model-name "$STUDIO_LLM_NAME" \
     --host 127.0.0.1 --port 18000 \
     --quantization fp8 --kv-cache-dtype fp8 --max-model-len "${VLLM_MAX_MODEL_LEN:-65536}" --max-num-seqs 8 \
     --gpu-memory-utilization "${VLLM_GPU_UTIL:-0.42}" --language-model-only \
     --enable-auto-tool-choice --tool-call-parser qwen3_xml --reasoning-parser qwen3 \
     --speculative-config '{"method":"mtp","num_speculative_tokens":3}' ${VLLM_EXTRA_ARGS:-}
+exit $?

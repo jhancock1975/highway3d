@@ -99,6 +99,11 @@ else
     fail "provisioner did not report success"
 fi
 docker logs "$NAME" > "$OUT/boot.log" 2>&1
+if grep -q "Traceback" "$OUT/boot.log" && grep -B2 -A8 "Traceback" "$OUT/boot.log" | grep -q "log-tee"; then
+    fail "a supervisor program's log copier (log-tee) crashed at boot"; grep -A8 "Traceback" "$OUT/boot.log" | head -20
+else
+    pass "every program's log copier started"
+fi
 grep -q 'provisioning from /opt/studio-vast/provisioning/none.yaml' "$OUT/boot.log" \
     && pass "STUDIO_MODELS=none picked none.yaml" || fail "STUDIO_MODELS=none did not pick none.yaml"
 for set in all none; do
