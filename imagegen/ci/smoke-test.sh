@@ -62,18 +62,28 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=localhost" \
     -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" \
     -keyout "$OUT/instance.key" -out "$OUT/instance.crt" 2>/dev/null
 docker rm -f "$NAME" >/dev/null 2>&1 || true
+# VAST_TCP_PORT_<port> is how vast tells the container which ports it mapped; Caddy only
+# fronts ports that have one. 8080 is left out, which drops Jupyter like vast does when
+# that port is not open.
 docker create --name "$NAME" --shm-size=2g \
     -e OPEN_BUTTON_TOKEN="$TOKEN" \
+    -e VAST_TCP_PORT_1111=1111 -e VAST_TCP_PORT_7801=7801 -e VAST_TCP_PORT_8188=8188 \
     -e IMAGEGEN_MODELS=none \
     -e COMFYUI_ARGS="--disable-auto-launch --enable-cors-header --port 18188 --cpu" \
     "$IMAGE" --no-update-portal --no-update-vast >/dev/null
 docker cp "$OUT/instance.crt" "$NAME:/etc/instance.crt"
 docker cp "$OUT/instance.key" "$NAME:/etc/instance.key"
+# On vast the portal opens a public trycloudflare.com quick tunnel per app at startup.
+# A CI runner has no business doing that, so the tunnel manager stays off here.
+docker cp "$NAME:/etc/supervisor/conf.d/tunnel_manager.conf" "$OUT/tunnel_manager.conf"
+sed -i 's/^autostart=.*/autostart=false/' "$OUT/tunnel_manager.conf"
+grep -q '^autostart=false' "$OUT/tunnel_manager.conf" || echo 'autostart=false' >> "$OUT/tunnel_manager.conf"
+docker cp "$OUT/tunnel_manager.conf" "$NAME:/etc/supervisor/conf.d/tunnel_manager.conf"
 docker start "$NAME" >/dev/null && pass "container started"
 
 section "first boot and provisioning"
-wait_until 900 "provisioning finished (/.provisioning removed)" \
-    docker exec "$NAME" sh -c 'test ! -e /.provisioning'
+wait_until 900 "provisioning finished" docker exec "$NAME" sh -c \
+    'test ! -e /.provisioning && { test -e /.provisioning_complete || test -e /.provisioning_failed; }'
 if docker exec "$NAME" test -e /.provisioning_complete && ! docker exec "$NAME" test -e /.provisioning_failed; then
     pass "provisioner reported success"
 else
@@ -182,8 +192,9 @@ else
     img=$(json 'd["images"][0]' < "$OUT/generate.json" 2>/dev/null)
     if [[ -n "$img" && "$img" != data:* ]]; then
         # fetch the result the way a browser would: through Caddy, with the token
+        path=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$img")
         docker exec "$NAME" curl -sk --max-time 60 -H "Authorization: Bearer $TOKEN" \
-            -o /tmp/smoke.png "https://127.0.0.1:7801/$img"
+            -o /tmp/smoke.png "https://127.0.0.1:7801/$path"
         docker cp "$NAME:/tmp/smoke.png" "$OUT/smoke.png" >/dev/null 2>&1
     fi
     if [[ -s "$OUT/smoke.png" ]] && head -c 8 "$OUT/smoke.png" | od -An -tx1 | grep -q '89 50 4e 47 0d 0a 1a 0a'; then

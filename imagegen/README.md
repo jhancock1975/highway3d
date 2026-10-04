@@ -87,7 +87,8 @@ boot, e.g. a LoRA:
 Leave authentication on (it is on by default). Each app's port is served by vast's Caddy
 proxy with TLS, and only the Open button's cookie, a `Bearer` token or the
 `vastai` / token basic-auth login gets through. The apps themselves only listen on
-127.0.0.1.
+127.0.0.1. vast's portal also opens a trycloudflare.com link per app (listed in the
+portal's Tunnels tab); those go through the same login.
 
 ### Which machine to rent
 
@@ -111,7 +112,7 @@ just untick it (SwarmUI then picks fp8 for Krea 2 on its own). That halves Kroma
 ### First boot
 
 1. vast pulls the image. When the host already has vast's ComfyUI image cached (common),
-   only the ~2 GB of layers added here download; otherwise about 12 GB.
+   only the ~1.2 GB of layers added here download; otherwise about 12 GB.
 2. The provisioner downloads the models (62.7 GB with `IMAGEGEN_MODELS=all`, three files
    at a time). Expect roughly 10 minutes on a fast (1 Gbps+) host and 20-30 minutes on a
    500 Mbps one; about half that for `kroma` or `chroma` alone.
@@ -157,7 +158,7 @@ SwarmUI. Any other model can simply be dropped into the matching folder under
 ## How it is put together
 
 - `Dockerfile` — `FROM vastai/comfy:v0.38.0-cuda-12.9-py312` (ComfyUI v0.38.0, which has
-  native Krea 2 support). Adds the .NET 8 SDK, SwarmUI at commit `d9ecb52` (built at image
+  native Krea 2 support). Adds the .NET 8 and 10 SDKs, SwarmUI at commit `d9ecb52` (built at image
   build time), SwarmUI's ComfyUI nodes (`SwarmComfyCommon`, `SwarmComfyExtra`) and their
   Python packages. Nothing in the base image is modified, so its layers keep vast's
   digests and vast hosts that have them cached skip them.
@@ -186,7 +187,8 @@ Dockerfile and push.
 2. Builds the image and pushes it as `:<short sha>`, then checks the base layers kept vast's
    digests.
 3. Boots it on the CPU runner the way vast does (entrypoint, supervisor, Instance Portal,
-   Caddy with TLS, provisioning with `IMAGEGEN_MODELS=none`, ComfyUI with `--cpu`) and checks:
+   Caddy with TLS, provisioning with `IMAGEGEN_MODELS=none`, ComfyUI with `--cpu`; only the
+   portal's public quick tunnels are switched off) and checks:
    ComfyUI answers on 18188 with SwarmUI's nodes loaded and Krea 2 / Chroma support;
    SwarmUI answers on 17801 with no install wizard; SwarmUI's API reports its ComfyUI
    backend as running; the per-model presets exist and are linked; Caddy refuses anonymous

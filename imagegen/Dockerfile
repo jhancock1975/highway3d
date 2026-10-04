@@ -18,15 +18,17 @@ LABEL org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.version="swarmui-${SWARMUI_REF}" \
       maintainer="jhancock1975"
 
-# .NET 8 SDK for SwarmUI. The SDK carries the ASP.NET runtime it needs to run, and
-# keeping the SDK (rather than just the runtime) lets SwarmUI rebuild itself after an
-# update on a live instance.
+# .NET SDKs for SwarmUI: 8.0, which this SwarmUI commit targets, and 10.0, which SwarmUI
+# asks for at startup because upcoming versions move to it (its own Linux installer puts
+# both in). The SDKs carry the ASP.NET runtimes SwarmUI needs, and keeping SDKs rather
+# than bare runtimes lets SwarmUI rebuild itself after an update on a live instance.
 ENV DOTNET_ROOT=/opt/dotnet \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
     DOTNET_NOLOGO=1 \
     DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 RUN set -euo pipefail && \
     curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+    bash /tmp/dotnet-install.sh --channel 10.0 --install-dir "${DOTNET_ROOT}" && \
     bash /tmp/dotnet-install.sh --channel 8.0 --install-dir "${DOTNET_ROOT}" && \
     ln -sf "${DOTNET_ROOT}/dotnet" /usr/local/bin/dotnet && \
     rm -f /tmp/dotnet-install.sh && \
