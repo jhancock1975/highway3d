@@ -20,9 +20,12 @@ stable. Log it with `>> ~/Library/Logs/studio-mcp.log 2>&1`.
 | `studio_speak` | text to speech, with word timings for captions |
 | `studio_music` | a music bed from a mood, exactly as long as asked |
 | `studio_card` | a text card drawn by GIMP |
-| `studio_picture` | a picture from xAI (needs `XAI_API_KEY`; prepaid credit) |
+| `studio_picture` | pictures from Chroma1-HD on this machine's ComfyUI (`STUDIO_PICTURES=comfyui`, 1 to 4 at a time), or from xAI (needs `XAI_API_KEY`; prepaid credit) |
+| `studio_animate` | a picture animated into a silent clip of up to 5 seconds by Wan 2.2 image-to-video through ComfyUI, as a job |
+| `studio_extend` | a clip carried on from its last frame for up to 5 more seconds, joined into a new, longer clip, as a job |
+| `studio_compose` | music from a description by ACE-Step 1.5 (under `lectern/.musicvenv`), 10 s to 10 min, as a job |
 | `studio_assemble` | cuts it all into an mp4 (or m4a), as a job |
-| `studio_status` | how a job is going; no id means the newest |
+| `studio_status` | how a job is going (assembly, animation, extension, music); no id means the newest |
 | `studio_list` | what is in the library |
 
 Every asset has an id saying where it came from: `voice-`, `music-`,
