@@ -124,7 +124,7 @@ def main():
            {"id": DIRECTOR, "base_model_id": LLM, "name": "Studio Director",
             "meta": {"description": "Plans scenes and makes them: keyframes, animation, voices, music, the cut.",
                      "toolIds": ["studio_ui"] + [f"server:mcp:{sid}" for sid, *_ in MCP],
-                     "capabilities": {"builtin_tools": False, "status_updates": True}},
+                     "capabilities": {"builtin_tools": False, "status_updates": True, "vision": True}},
             "params": {"system": system, "function_calling": "native", "temperature": 0.7,
                        "reasoning_effort": "low"},
             "access_grants": [], "is_active": True}, token)
