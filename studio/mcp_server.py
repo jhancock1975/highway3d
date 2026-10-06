@@ -178,13 +178,16 @@ def studio_picture(
     count: Annotated[int, Field(ge=1, le=4, description="How many takes to paint at once, 1 to 4.")] = 1,
     negative: Annotated[str, Field(description="What to keep out of the picture (Chroma only).")] = "",
     seed: Annotated[int, Field(description="-1 for new random takes; a number repeats a take.")] = -1,
+    from_picture: Annotated[str, Field(description="An earlier pic- id to paint from, so its characters and look carry over (Chroma only).")] = "",
+    change: Annotated[float, Field(ge=0.2, le=0.95, description="With from_picture: how far to move from it, 0.2 (a touch) to 0.95 (almost new).")] = 0.8,
 ) -> str:
-    """Paint pictures from a description, filed in the library as pic- ids. On a machine with STUDIO_PICTURES=comfyui (the vast.ai studio) they come from Chroma1-HD, an uncensored open model, 1 to 4 takes at a time, about a megapixel each; elsewhere from xAI's image model, paid from prepaid credit, one at a time with up to 5 reference pictures. aspect is 16:9 (the default), 9:16, 1:1, 4:3, 3:4, 3:2, 2:3, 21:9 or auto; resolution is 1k, 1.5k or 2k (the default). Keyframes made here can be animated with studio_animate."""
+    """Paint pictures from a description, filed in the library as pic- ids. On a machine with STUDIO_PICTURES=comfyui (the vast.ai studio) they come from Chroma1-HD, an uncensored open model, 1 to 4 takes at a time, about a megapixel each; elsewhere from xAI's image model, paid from prepaid credit, one at a time with up to 5 reference pictures. aspect is 16:9 (the default), 9:16, 1:1, 4:3, 3:4, 3:2, 2:3, 21:9 or auto; resolution is 1k, 1.5k or 2k (the default). With from_picture, a new keyframe is painted from an earlier one, so the same characters carry over: change about 0.6 keeps the same shot with small changes; about 0.85 moves to a new place or pose, keeping clothes, colours and look, though faces can drift. Keyframes made here can be animated with studio_animate."""
     try:
         if images.PICTURES == "comfyui":
             if references:
                 return "No picture was made: reference pictures need xAI; Chroma paints from the description alone."
-            notes = images.paint(prompt, aspect, count, negative, seed)
+            notes = images.paint(prompt, aspect, count, negative, seed,
+                                 from_picture=from_picture.strip() or None, change=change)
             return "\n".join(library.said(n) for n in notes) + "\nShow them with show; animate one with studio_animate."
         return library.said(images.picture(prompt, aspect, resolution, references)) + "."
     except Exception as e:

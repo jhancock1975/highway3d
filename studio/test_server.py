@@ -161,6 +161,13 @@ def test_descriptions_mention_the_new_engines():
     assert "ACE-Step" in tools["studio_compose"]
 
 
+
+def test_picture_can_be_painted_from_an_earlier_one():
+    listed = {t.name: t for t in anyio.run(S.mcp.list_tools)}
+    params = listed["studio_picture"].input_schema["properties"]
+    assert "from_picture" in params and "change" in params, sorted(params)
+    assert "from_picture" in listed["studio_picture"].description
+
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     bad = 0
