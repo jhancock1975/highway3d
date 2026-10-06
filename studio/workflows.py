@@ -99,6 +99,22 @@ def chroma_t2i(prompt: str, width: int, height: int, count: int = 1, seed: int =
     }
 
 
+def chroma_i2i(image: str, prompt: str, width: int, height: int, change: float = 0.6, count: int = 1,
+               seed: int = 0, negative: str = "", prefix: str = "studio/pic") -> dict:
+    """A new picture painted from an earlier one (a name in ComfyUI's input folder): its people and
+    look carry over, and `change` (the sampler's denoise, 0 to 1) says how far the prompt moves it."""
+    g = chroma_t2i(prompt, width, height, count=1, seed=seed, negative=negative, prefix=prefix)
+    g["12"] = {"class_type": "LoadImage", "inputs": {"image": image}}
+    g["13"] = {"class_type": "ImageScale", "inputs": {"image": ["12", 0], "upscale_method": "lanczos",
+                                                       "width": width, "height": height, "crop": "center"}}
+    g["8"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["13", 0], "vae": ["4", 0]}}
+    if count > 1:
+        g["14"] = {"class_type": "RepeatLatentBatch", "inputs": {"samples": ["8", 0], "amount": count}}
+        g["9"]["inputs"]["latent_image"] = ["14", 0]
+    g["9"]["inputs"]["denoise"] = change
+    return g
+
+
 def wan_i2v(image: str, prompt: str, width: int, height: int, length: int, seed: int = 0,
             negative: str = "", prefix: str = "studio/clip") -> dict:
     """A start frame (a name in ComfyUI's input folder) to `length` frames of video."""
