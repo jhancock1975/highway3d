@@ -27,8 +27,7 @@ STYLE = (
     ".grid{display:flex;flex-wrap:wrap;gap:10px;padding:8px}figure{margin:0}"
     "figure img,figure video{max-width:min(100%,640px);max-height:480px;border-radius:6px;display:block}"
     "figcaption{padding:4px 2px;color:#aaa}figcaption b{color:#fff}"
-    ".bar{height:10px;background:#333;border-radius:5px;overflow:hidden;margin:8px}"
-    ".bar div{height:100%;background:#4c8bf5;transition:width .5s}.stage{padding:4px 8px}</style>"
+    "</style>"
 )
 GRACE = 10  # seconds a job's process gets to appear after its log is written
 
@@ -135,13 +134,12 @@ class Tools:
                             headers={"Content-Disposition": "inline"})
 
     @staticmethod
-    def _bar(name: str, stage: str, percent) -> str:
-        width = f"{percent:.0f}%" if percent is not None else "100%"
-        shade = "" if percent is not None else ";opacity:.35"
-        return (f"<!doctype html><html><head><meta charset='utf-8'>{STYLE}</head><body>"
-                f"<div class='stage'><b>{html.escape(name)}</b>: {html.escape(stage)}"
-                f"{f' ({percent:.0f}%)' if percent is not None else ''}</div>"
-                f"<div class='bar'><div style='width:{width}{shade}'></div></div></body></html>")
+    def _meter(percent) -> str:
+        """A text progress bar for the status line, such as '▰▰▰▰▰▱▱▱▱▱ 50%'."""
+        if percent is None:
+            return ""
+        filled = max(0, min(10, round(percent / 10)))
+        return " " + "\u25b0" * filled + "\u25b1" * (10 - filled) + f" {percent:.0f}%"
 
     # ------------------------------------------------------------- tools
 
@@ -178,37 +176,34 @@ class Tools:
             return f"There is no studio job {job}; studio_status lists the recent ones."
         began, last = time.time(), None
         name = f"Job {job}"
-        try:
-            while time.time() - began < self.valves.max_minutes * 60:
-                head, tail = _read(log)
-                name = head.get("name") or name
-                if tail.startswith("DONE"):
-                    d = json.loads(tail[4:])
-                    await emit({"type": "status", "data": {"description": f"{name}: finished", "done": True}})
-                    n = self._find(d["asset"]) if d.get("asset") else self._find(d.get("out", ""))
-                    if n and self._url(n["path"]):
-                        return (self._page("<div class='grid'>" + self._figure(n) + "</div>"),
-                                f"Job {job} finished: {n['id']} ({_describe(n)}), shown in the chat.")
-                    return f"Job {job} finished: {d.get('out')}."
-                if tail.startswith("FAILED"):
-                    await emit({"type": "status", "data": {"description": f"{name}: failed", "done": True}})
-                    return f"Job {job} failed: {tail[6:].strip()}"
-                if not _alive(job) and time.time() - os.path.getmtime(log) > GRACE:
-                    await emit({"type": "status", "data": {"description": f"{name}: stopped", "done": True}})
-                    return (f"Job {job} stopped before it finished: its process is gone, most likely "
-                            f"because the machine restarted. Starting the same work again starts it over.")
-                stage, percent = "started", None
-                if tail.startswith("PROGRESS"):
-                    d = json.loads(tail[8:])
-                    stage, percent = d.get("stage", stage), d.get("percent")
-                if (stage, percent) != last:
-                    last = (stage, percent)
-                    pct = f" ({percent:.0f}%)" if percent is not None else ""
-                    await emit({"type": "status", "data": {"description": f"{name}: {stage}{pct}", "done": False}})
-                    await emit({"type": "embeds", "data": {"embeds": [self._bar(name, stage, percent)],
-                                                            "replace": True}})
-                await asyncio.sleep(self.valves.poll_seconds)
-            return (f"Job {job} is still running after {self.valves.max_minutes} minutes; "
-                    f"call watch_job again to keep following it.")
-        finally:
-            await emit({"type": "embeds", "data": {"embeds": [], "replace": True}})
+        while time.time() - began < self.valves.max_minutes * 60:
+            head, tail = _read(log)
+            name = head.get("name") or name
+            if tail.startswith("DONE"):
+                d = json.loads(tail[4:])
+                await emit({"type": "status", "data": {"description": f"{name}: finished", "done": True}})
+                n = self._find(d["asset"]) if d.get("asset") else self._find(d.get("out", ""))
+                if n and self._url(n["path"]):
+                    return (self._page("<div class='grid'>" + self._figure(n) + "</div>"),
+                            f"Job {job} finished: {n['id']} ({_describe(n)}), shown in the chat.")
+                return f"Job {job} finished: {d.get('out')}."
+            if tail.startswith("FAILED"):
+                await emit({"type": "status", "data": {"description": f"{name}: failed", "done": True}})
+                return f"Job {job} failed: {tail[6:].strip()}"
+            if not _alive(job) and time.time() - os.path.getmtime(log) > GRACE:
+                await emit({"type": "status", "data": {"description": f"{name}: stopped", "done": True}})
+                return (f"Job {job} stopped before it finished: its process is gone, most likely "
+                        f"because the machine restarted. Starting the same work again starts it over.")
+            stage, percent = "started", None
+            if tail.startswith("PROGRESS"):
+                d = json.loads(tail[8:])
+                stage, percent = d.get("stage", stage), d.get("percent")
+            # Progress lives in the status line only. An embedded frame redrawn on every update
+            # collapses and regrows, and the chat jumps while the person is scrolling.
+            if (stage, percent) != last:
+                last = (stage, percent)
+                await emit({"type": "status",
+                            "data": {"description": f"{name}: {stage}{self._meter(percent)}", "done": False}})
+            await asyncio.sleep(self.valves.poll_seconds)
+        return (f"Job {job} is still running after {self.valves.max_minutes} minutes; "
+                f"call watch_job again to keep following it.")

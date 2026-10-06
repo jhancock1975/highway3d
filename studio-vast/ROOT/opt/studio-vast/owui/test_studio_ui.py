@@ -91,8 +91,10 @@ def test_watch_shows_progress_live_then_the_clip():
     page, text = run(tools().watch_job("w1", __event_emitter__=ev))
     assert any(e["type"] == "status" and "high-noise pass" in e["data"]["description"]
                and "50%" in e["data"]["description"] for e in ev), ev
-    assert any(e["type"] == "embeds" for e in ev)
-    assert ev[-1]["type"] == "embeds" and ev[-1]["data"] == {"embeds": [], "replace": True}, ev[-1]
+    # Progress stays in the status line: an embedded frame redrawn on every update collapses and
+    # regrows, and the chat jumps while the person scrolls.
+    assert not any(e["type"] == "embeds" for e in ev), [e for e in ev if e["type"] == "embeds"]
+    assert any(e["type"] == "status" and "\u25b0" in e["data"]["description"] for e in ev), ev
     assert "clip-9c01" in page.body.decode() and "clip-9c01" in text
 
 
