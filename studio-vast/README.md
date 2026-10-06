@@ -47,9 +47,14 @@ vast's login cookie from it, so Caddy refuses every picture and video.
 | Music | **ACE-Step 1.5** turbo (`ACE-Step/Ace-Step1.5`) | 10.1 GB | MIT |
 | Voices | **Kokoro-82M** (`hexgrad/Kokoro-82M`), with the repo's own voice blends | 0.4 GB | Apache-2.0 |
 
-About 125 GB in all, every file pinned to a commit and downloadable without a token
-(`ROOT/opt/studio-vast/provisioning/all.yaml`). They download on the first boot, so the
-first boot takes a while; a restart of the same instance keeps them.
+About 125 GB in all, every file pinned to a commit and downloadable without a token. They
+download on the first boot, so the first boot takes a while (15-20 minutes on a fast host);
+a restart of the same instance keeps them. vast's provisioning fetches the ComfyUI models and
+Kokoro (`ROOT/opt/studio-vast/provisioning/all.yaml`). At the same time, `studio-models`
+(`ROOT/opt/supervisor-scripts/studio-models.sh`) fetches the director, then ACE-Step, so the
+chat works as soon as the director is in, while Wan is still downloading. It runs each
+download through `studio-fetch.py`, which starts a download again, from where it got to,
+when it stalls: under 5 MB/s for three minutes.
 
 What's legal: every one of these licences, and the law, forbids sexual content involving
 minors and non-consensual sexual imagery of real people. The director's instructions
@@ -59,13 +64,17 @@ character is invented. Beyond that the director does not refuse adult subject ma
 
 ## The GPU and its memory
 
-One RTX PRO 6000 (96 GB). vLLM takes 42% of it (about 40 GB: the FP8 weights, a 64k-token
-context and its cache), and the rest is shared one job at a time by ComfyUI (Chroma about
-25 GB, Wan about 35-45 GB at 720p), ACE-Step (about 14 GB) and Blender. ComfyUI runs with
+One RTX PRO 6000 (96 GB) by default. vLLM takes about 40 GB of it (the FP8 weights, a
+64k-token context and its cache), and the rest is shared one job at a time by ComfyUI
+(Chroma about 25 GB, Wan about 35-45 GB at 720p), ACE-Step (about 14 GB) and Blender. On a
+bigger card vLLM still takes 40 GB (`gpu-plan.py` works the fraction out at boot and writes
+it to `/etc/studio-gpus.env`). With two or more cards, vLLM has the first to itself and
+ComfyUI, ACE-Step and Blender use the others. ComfyUI runs with
 `--disable-smart-memory`, so it moves its models back to RAM when each picture or clip is
 done and the next job finds the card free; reloading them costs a second or two. Without
 that, Wan stayed on the card after a clip and ACE-Step ran out of memory loading.
-`VLLM_GPU_UTIL` and `VLLM_MAX_MODEL_LEN` change vLLM's share if a different card is used.
+`STUDIO_LLM_GB` changes vLLM's 40 GB, `VLLM_GPU_UTIL` sets its fraction outright, and
+`VLLM_MAX_MODEL_LEN` its context.
 
 ## Launching
 
@@ -75,8 +84,10 @@ From `~/git/vast-render`:
 ./vast-studio.sh --wait
 ```
 
-It rents the cheapest RTX PRO 6000 with 300 GB of disk outside China and waits until the
-chat answers. Open the instance with its Open button on
+It rents the RTX PRO 6000 with the fastest download line (at least 5 Gbps; a first boot
+is mostly downloads), 300 GB of disk, outside China, and waits until the director answers.
+`--gpu h200` or `--gpu b200` rents a bigger card, `--gpus 2` two of them, `--min-down`
+changes the 5 Gbps and `--cheapest` sorts by price instead. Open the instance with its Open button on
 [cloud.vast.ai/instances](https://cloud.vast.ai/instances/). Destroy it with
 `vastai destroy instance ID` when you are done; it bills until you do.
 
@@ -96,7 +107,7 @@ chat answers. Open the instance with its Open button on
 
 ## Changing a model
 
-- Director: change the `hf download` line in `provisioning/all.yaml` and
+- Director: change its line in `ROOT/opt/supervisor-scripts/studio-models.sh` and
   `STUDIO_LLM_DIR` in `ROOT/opt/studio-vast/bin/studio-env.sh`; vLLM's flags are in
   `ROOT/opt/supervisor-scripts/vllm.sh`.
 - Keyframes or animation: the downloads in `provisioning/all.yaml`, and the file names
@@ -125,7 +136,8 @@ renderers:
    - a chat sent through Open WebUI's API reaches the studio's MCP server, with a
      stand-in playing vLLM;
    - Caddy fronts every port with TLS and the token.
-5. Only then is `:latest` moved to the new build.
+5. Only then, and only for a push to `main`, is `:latest` moved to the new build. A
+   branch's build keeps just its commit tag.
 
 On a rented GPU, `~/git/vast-render/acceptance.py INSTANCE_ID` plays the person's side of
 the conversation above through Open WebUI's API, downloads the finished film, and checks

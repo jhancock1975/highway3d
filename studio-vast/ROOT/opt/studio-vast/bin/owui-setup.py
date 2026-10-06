@@ -28,7 +28,7 @@ LLM_URL = os.environ.get("STUDIO_LLM_URL", "http://127.0.0.1:18000/v1/models")
 BANNER_ID = "studio-llm-waiting"
 BANNER = ("The director's model isn't up yet. On a first boot it is still downloading (about 125 GB) and then "
           "loading, 15 to 30 minutes in all, and a chat before then gets a connection error. If this stays, "
-          "see /var/log/portal/provisioning.log and /var/log/portal/vllm.log.")
+          "see /var/log/portal/studio-models.log and /var/log/portal/vllm.log.")
 # Added to every MCP port; tests on a machine already running these servers use 10000.
 PORT_OFFSET = int(os.environ.get("STUDIO_MCP_PORT_OFFSET", "0"))
 MCP = [("studio", "Studio", 8768, "Keyframes, animation, voices, music, cards and the edit"),

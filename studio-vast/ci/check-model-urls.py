@@ -4,7 +4,8 @@
 - every download URL answers a token-less HEAD with 200, through Hugging Face's redirects,
   and reports a size;
 - every destination is under /workspace, and no two share one;
-- every `hf download REPO --revision SHA` in post_commands names a public, ungated repo at a
+- every `hf download REPO --revision SHA` in post_commands, and every repo studio-models.sh fetches
+  with studio-fetch.py, names a public, ungated repo at a
   commit that exists;
 - none.yaml downloads nothing.
 
@@ -43,9 +44,30 @@ def api(path):
         return {}
 
 
+def check_repo(repo, rev):
+    """(bytes, problems) for one pinned repo."""
+    info = api(f"{repo}/revision/{rev}")
+    if info.get("sha") == rev and not info.get("gated") and not info.get("private"):
+        size = sum(s.get("size", 0) or 0 for s in api(f"{repo}?blobs=true").get("siblings", []))
+        print(f"ok    {size / 1e9:6.2f} GB  {repo}@{rev[:8]} (public, not gated)")
+        return size, 0
+    print(f"FAIL  {repo}@{rev} is missing, gated or private")
+    return 0, 1
+
+
 def main(folder):
     bad = 0
     total = 0
+    fetcher = os.path.join(folder, "..", "..", "supervisor-scripts", "studio-models.sh")
+    if os.path.exists(fetcher):
+        pins = re.findall(r'"\$FETCH" (\S+) ([0-9a-f]{40})', open(fetcher).read())
+        print(f"== studio-models.sh: {len(pins)} repos")
+        if not pins:
+            print("FAIL  studio-models.sh fetches nothing")
+            bad += 1
+        for repo, rev in pins:
+            size, problems = check_repo(repo, rev)
+            total, bad = total + size, bad + problems
     for name in sorted(os.listdir(folder)):
         m = yaml.safe_load(open(os.path.join(folder, name)))
         downloads, posts = m.get("downloads") or [], m.get("post_commands") or []
@@ -70,14 +92,8 @@ def main(folder):
                 bad += 1
         for cmd in posts:
             for repo, rev in re.findall(r"hf download (\S+) --revision ([0-9a-f]{40})", cmd):
-                info = api(f"{repo}/revision/{rev}")
-                if info.get("sha") == rev and not info.get("gated") and not info.get("private"):
-                    size = sum(s.get("size", 0) or 0 for s in api(f"{repo}?blobs=true").get("siblings", []))
-                    total += size
-                    print(f"ok    {size / 1e9:6.2f} GB  {repo}@{rev[:8]} (public, not gated)")
-                else:
-                    print(f"FAIL  {repo}@{rev} is missing, gated or private")
-                    bad += 1
+                size, problems = check_repo(repo, rev)
+                total, bad = total + size, bad + problems
     print(f"\ntotal about {total / 1e9:.1f} GB; {bad} problem(s)")
     sys.exit(1 if bad else 0)
 
