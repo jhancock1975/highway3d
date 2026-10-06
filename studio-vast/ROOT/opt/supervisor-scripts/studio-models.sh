@@ -10,6 +10,7 @@ utils=/opt/supervisor-scripts/utils
 
 if [[ "${STUDIO_MODELS:-all}" == none ]]; then
     echo "STUDIO_MODELS=none: no studio model downloads."
+    sleep 6     # let the log copier pick the line up before this exits, as vllm.sh does
     exit 0
 fi
 FETCH=/opt/studio-vast/bin/studio-fetch.py
