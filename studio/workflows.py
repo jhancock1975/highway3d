@@ -16,9 +16,13 @@ core nodes, so nothing beyond vast's ComfyUI image is needed:
 from __future__ import annotations
 
 import math
+import os
 
-CHROMA = dict(unet="Chroma1-HD.safetensors", clip="t5xxl_enconly.safetensors",
-              vae="Flux/ae.safetensors")
+# The server's files; a Mac with less memory runs GGUF ones (STUDIO_CHROMA_UNET/CLIP ending in
+# .gguf), through ComfyUI-GGUF's loaders.
+CHROMA = dict(unet=os.environ.get("STUDIO_CHROMA_UNET") or "Chroma1-HD.safetensors",
+              clip=os.environ.get("STUDIO_CHROMA_CLIP") or "t5xxl_enconly.safetensors",
+              vae=os.environ.get("STUDIO_CHROMA_VAE") or "Flux/ae.safetensors")
 WAN = dict(high="Wan2.2_Remix_NSFW_i2v_14b_high_lighting_fp8_e4m3fn_v3.0.safetensors",
            low="Wan2.2_Remix_NSFW_i2v_14b_low_lighting_fp8_e4m3fn_v3.0.safetensors",
            clip="nsfw_wan_umt5-xxl_fp8_scaled.safetensors",
@@ -69,9 +73,17 @@ def nearest_aspect(width: int, height: int, table: dict) -> str:
 def chroma_t2i(prompt: str, width: int, height: int, count: int = 1, seed: int = 0,
                negative: str = "", prefix: str = "studio/pic") -> dict:
     """Text to `count` pictures with Chroma1-HD."""
+    if CHROMA["unet"].endswith(".gguf"):
+        unet = {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": CHROMA["unet"]}}
+    else:
+        unet = {"class_type": "UNETLoader", "inputs": {"unet_name": CHROMA["unet"], "weight_dtype": "default"}}
+    if CHROMA["clip"].endswith(".gguf"):
+        clip = {"class_type": "CLIPLoaderGGUF", "inputs": {"clip_name": CHROMA["clip"], "type": "chroma"}}
+    else:
+        clip = {"class_type": "CLIPLoader", "inputs": {"clip_name": CHROMA["clip"], "type": "chroma", "device": "default"}}
     return {
-        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": CHROMA["unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": CHROMA["clip"], "type": "chroma", "device": "default"}},
+        "1": unet,
+        "2": clip,
         "3": {"class_type": "T5TokenizerOptions", "inputs": {"clip": ["2", 0], "min_padding": 0, "min_length": 0}},
         "4": {"class_type": "VAELoader", "inputs": {"vae_name": CHROMA["vae"]}},
         "5": {"class_type": "ModelSamplingAuraFlow", "inputs": {"model": ["1", 0], "shift": 1.0}},

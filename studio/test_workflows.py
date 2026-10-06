@@ -2,6 +2,7 @@
 
     studio/.venv/bin/python studio/test_workflows.py
 """
+import json
 import os
 import sys
 
@@ -73,6 +74,25 @@ def test_every_size_is_a_multiple_of_sixteen():
         for w, h in table.values():
             assert w % 16 == 0 and h % 16 == 0, (w, h)
 
+
+
+def test_gguf_chroma_files_use_the_gguf_loaders():
+    import subprocess
+    code = ("import json; from studio import workflows as W; "
+            "print(json.dumps(W.chroma_t2i('a lighthouse', 1024, 1024)))")
+    env = dict(os.environ, STUDIO_CHROMA_UNET="Chroma1-HD-Q6_K.gguf", STUDIO_CHROMA_CLIP="t5-v1_1-xxl-encoder-Q6_K.gguf")
+    r = subprocess.run([sys.executable, "-c", code], cwd=os.path.dirname(HERE), env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    g = json.loads(r.stdout)
+    assert g["1"] == {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "Chroma1-HD-Q6_K.gguf"}}, g["1"]
+    assert g["2"] == {"class_type": "CLIPLoaderGGUF",
+                      "inputs": {"clip_name": "t5-v1_1-xxl-encoder-Q6_K.gguf", "type": "chroma"}}, g["2"]
+    assert g["5"]["inputs"]["model"] == ["1", 0] and g["3"]["inputs"]["clip"] == ["2", 0]
+
+
+def test_the_server_keeps_its_safetensors_loaders():
+    g = W.chroma_t2i("a lighthouse", 1024, 1024)
+    assert g["1"]["class_type"] == "UNETLoader" and g["2"]["class_type"] == "CLIPLoader", (g["1"], g["2"])
 
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
