@@ -202,6 +202,8 @@ inside "Kokoro speaks, GIMP draws, ffmpeg assembles (studio/test_engines.py)" \
     '. /opt/studio-vast/bin/studio-env.sh && cd /opt/highway3d && studio/.venv/bin/python studio/test_engines.py'
 inside "ACE-Step imports in its venv, on the base image's torch" \
     '/opt/highway3d/lectern/.musicvenv/bin/python -c "import acestep.handler, acestep.inference, acestep.llm_inference, torch; print(torch.__version__)"'
+inside "vLLM is started to take pictures, not text only" \
+    'grep -q "limit-mm-per-prompt" /opt/supervisor-scripts/vllm.sh && ! grep -q "language-model-only" /opt/supervisor-scripts/vllm.sh'
 inside "vLLM imports" '/opt/vllm/bin/python -c "import vllm; print(vllm.__version__)"'
 inside "ffmpeg has the assembler's filters" \
     'f=$(ffmpeg -hide_banner -filters 2>/dev/null); for x in xfade zoompan sidechaincompress loudnorm; do echo "$f" | grep -qw "$x" || { echo "no $x"; exit 1; }; done'

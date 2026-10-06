@@ -2,7 +2,9 @@
 # vLLM serving the director (Qwen3.8-27B abliterated, quantised to FP8 as it loads) on
 # 127.0.0.1:18000 for Open WebUI and lectern's author. Takes about 40 GB of a single GPU (the
 # share gpu-plan.py works out, VLLM_GPU_UTIL), or GPU 0 to itself when there are more. Exits
-# cleanly when there is no model (STUDIO_MODELS=none, or its download gave up).
+# cleanly when there is no model (STUDIO_MODELS=none, or its download gave up). It sees pictures
+# too: up to 8 a prompt, each scaled to about a megapixel (~1,000 tokens), since Open WebUI sends
+# every picture in a chat again with each new message.
 utils=/opt/supervisor-scripts/utils
 . "${utils}/logging.sh"
 . "${utils}/cleanup_generic.sh"
@@ -31,7 +33,8 @@ export VLLM_NO_USAGE_STATS=1 DO_NOT_TRACK=1 PYTHONUNBUFFERED=1
 /opt/vllm/bin/vllm serve "$STUDIO_LLM_DIR" --served-model-name "$STUDIO_LLM_NAME" \
     --host 127.0.0.1 --port 18000 \
     --quantization fp8 --kv-cache-dtype fp8 --max-model-len "${VLLM_MAX_MODEL_LEN:-65536}" --max-num-seqs 8 \
-    --gpu-memory-utilization "${VLLM_GPU_UTIL:-0.42}" --language-model-only \
+    --gpu-memory-utilization "${VLLM_GPU_UTIL:-0.42}" \
+    --limit-mm-per-prompt '{"image":8,"video":0}' --mm-processor-kwargs '{"max_pixels":1048576}' \
     --enable-auto-tool-choice --tool-call-parser qwen3_xml --reasoning-parser qwen3 \
     --speculative-config '{"method":"mtp","num_speculative_tokens":3}' ${VLLM_EXTRA_ARGS:-}
 exit $?

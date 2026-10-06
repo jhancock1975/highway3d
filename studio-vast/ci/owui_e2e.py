@@ -46,6 +46,8 @@ model = call("GET", "/api/v1/models/model?id=studio-director", token=token)
 check(model and "director of a small film studio" in model["params"]["system"], "studio-director has the director prompt")
 check(model and "Never depict a real, identifiable person in anything" in model["params"]["system"],
       "the director keeps real people out of everything it makes, as the spec says")
+check(model and model["meta"]["capabilities"].get("vision") is True and "attaches a picture" in model["params"]["system"],
+      "the director takes pictures the person attaches, and is told to match their style")
 check(model and "Every shot is real motion" in model["params"]["system"]
       and "never stand in for animation" in model["params"]["system"],
       "the director animates every shot instead of zooming or panning over stills")
