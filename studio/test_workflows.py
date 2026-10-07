@@ -95,20 +95,6 @@ def test_the_server_keeps_its_safetensors_loaders():
     assert g["1"]["class_type"] == "UNETLoader" and g["2"]["class_type"] == "CLIPLoader", (g["1"], g["2"])
 
 
-def test_chroma_from_a_picture_starts_from_it_and_changes_only_so_much():
-    g = W.chroma_i2i("studio-start.png", "the same woman, now on a rooftop at night", 1344, 768, change=0.55, seed=4)
-    kinds = {k: n["class_type"] for k, n in g.items()}
-    load = next(k for k, c in kinds.items() if c == "LoadImage")
-    scale = next(k for k, c in kinds.items() if c == "ImageScale")
-    enc = next(k for k, c in kinds.items() if c == "VAEEncode")
-    samp = next(k for k, c in kinds.items() if c == "KSampler")
-    assert g[load]["inputs"]["image"] == "studio-start.png"
-    assert g[scale]["inputs"]["image"] == [load, 0] and (g[scale]["inputs"]["width"], g[scale]["inputs"]["height"]) == (1344, 768)
-    assert g[enc]["inputs"]["pixels"] == [scale, 0]
-    assert g[samp]["inputs"]["latent_image"] == [enc, 0] and g[samp]["inputs"]["denoise"] == 0.55
-    assert g[samp]["inputs"]["seed"] == 4 and "rooftop" in json.dumps(g)
-    assert not any(c == "EmptySD3LatentImage" for c in kinds.values())
-
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     bad = 0

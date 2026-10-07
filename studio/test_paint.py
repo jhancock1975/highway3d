@@ -103,45 +103,6 @@ def test_a_busy_comfyui_is_refused_at_once():
 
 
 
-def test_a_new_still_can_start_from_an_earlier_one():
-    c = FakeClient()
-    first = images.paint("a woman with short red hair and a green coat", "16:9", 1, seed=1, client=c)[0]
-    later = images.paint("the same woman, now on a rooftop at night", "16:9", 1, seed=2, client=c,
-                         from_picture=first["id"], change=0.5)[0]
-    assert c.uploads == [first["path"]], c.uploads
-    g = c.graphs[-1]
-    samp = next(n for n in g.values() if n["class_type"] == "KSampler")
-    assert samp["inputs"]["denoise"] == 0.5 and any(n["class_type"] == "VAEEncode" for n in g.values())
-    assert later["from_picture"] == first["id"] and later["change"] == 0.5, later
-
-
-def test_only_a_picture_can_be_painted_from():
-    c = FakeClient()
-    tone = os.path.join(tempfile.mkdtemp(), "tone.wav")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", tone], check=True)
-    sound = library.add(tone, "voice")
-    for bad in ("pic-zzzz", sound["id"]):
-        try:
-            images.paint("x", "16:9", 1, client=c, from_picture=bad)
-        except (KeyError, ValueError) as e:
-            assert bad in str(e), str(e)
-        else:
-            raise AssertionError(f"painted from {bad}")
-    assert c.graphs == [] and c.uploads == []
-
-
-def test_change_is_kept_between_a_touch_and_almost_new():
-    c = FakeClient()
-    first = images.paint("a man in a grey suit", "16:9", 1, client=c)[0]
-    for change in (0.0, 1.5):
-        try:
-            images.paint("x", "16:9", 1, client=c, from_picture=first["id"], change=change)
-        except ValueError as e:
-            assert "change" in str(e), str(e)
-        else:
-            raise AssertionError(f"accepted change={change}")
-
-
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
     bad = 0

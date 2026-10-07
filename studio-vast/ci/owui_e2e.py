@@ -48,12 +48,10 @@ check(model and "Never depict a real, identifiable person in anything" in model[
       "the director keeps real people out of everything it makes, as the spec says")
 check(model and model["meta"]["capabilities"].get("vision") is True and "attaches a picture" in model["params"]["system"],
       "the director takes pictures the person attaches, and is told to match their style")
+check(model and "studio_studio_cast" not in model["params"]["system"] and "from_picture" not in model["params"]["system"],
+      "the director paints every keyframe fresh from its prompt (no cast list, no painting from earlier stills)")
 check(model and 'engine="grok"' in model["params"]["system"],
       "the director knows when to paint with Grok and when to stay with Chroma")
-check(model and "studio_studio_cast" in model["params"]["system"] and "cast=[" in model["params"]["system"],
-      "the director casts each character once and names the cast in every picture and clip")
-check(model and "character sheet" in model["params"]["system"] and "from_picture" in model["params"]["system"],
-      "the director keeps characters the same by painting each new still from an earlier one")
 check(model and "Every shot is real motion" in model["params"]["system"]
       and "never stand in for animation" in model["params"]["system"],
       "the director animates every shot instead of zooming or panning over stills")
