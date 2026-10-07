@@ -99,22 +99,13 @@ def picture(prompt: str, aspect: str = "16:9", resolution: str = "2k",
 
 
 def paint(prompt: str, aspect: str = "16:9", count: int = 1, negative: str = "",
-          seed: int = -1, client=None, from_picture: str | None = None, change: float = 0.8) -> list[dict]:
-    """Keyframes from Chroma1-HD on this machine's ComfyUI, filed in the library as pic- ids. With
-    `from_picture`, each is painted from that earlier picture, so its characters and look carry
-    over; `change` is how far the prompt may move it, 0.2 (a touch) to 0.95 (almost new)."""
+          seed: int = -1, client=None) -> list[dict]:
+    """Keyframes from Chroma1-HD on this machine's ComfyUI, filed in the library as pic- ids."""
     if not prompt.strip():
         raise ValueError("a picture needs a prompt")
     count = int(count)
     if not 1 <= count <= 4:
         raise ValueError("pictures come 1 to 4 at a time")
-    source = None
-    if from_picture:
-        if not 0.2 <= float(change) <= 0.95:
-            raise ValueError("change runs from 0.2 (a touch) to 0.95 (almost a new picture)")
-        source = library.get(from_picture.strip())
-        if source["kind"] != "image":
-            raise ValueError(f"{from_picture} is a {source['kind']}; only a picture can be painted from")
     width, height = workflows.CHROMA_SIZES.get(aspect, workflows.CHROMA_SIZES["1:1"])
     seed = random.randrange(2 ** 31) if seed is None or int(seed) < 0 else int(seed)
     client = client or comfy.Comfy()
@@ -124,17 +115,12 @@ def paint(prompt: str, aspect: str = "16:9", count: int = 1, negative: str = "",
     if busy:
         raise RuntimeError(f"ComfyUI is busy with {busy} job{'s' if busy > 1 else ''} (an animation, or pictures "
                            f"from another chat); paint again when it is free, after watch_job shows that job done")
-    if source:
-        graph = workflows.chroma_i2i(client.upload(source["path"]), prompt, width, height, change=float(change),
-                                     count=count, seed=seed, negative=negative)
-    else:
-        graph = workflows.chroma_t2i(prompt, width, height, count=count, seed=seed, negative=negative)
+    graph = workflows.chroma_t2i(prompt, width, height, count=count, seed=seed, negative=negative)
     outputs = client.run(graph, labels=workflows.CHROMA_LABELS)
     tmp = tempfile.mkdtemp(prefix="studio-paint-")
     try:
-        extra = dict(from_picture=source["id"], change=float(change)) if source else {}
         notes = [library.add(client.download(f, tmp), "pic", source="comfyui: Chroma1-HD", move=True,
-                             prompt=prompt, aspect=aspect, seed=seed, take=i, negative=negative, **extra)
+                             prompt=prompt, aspect=aspect, seed=seed, take=i, negative=negative)
                  for i, f in enumerate(client.files(outputs))]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

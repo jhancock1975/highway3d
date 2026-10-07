@@ -21,7 +21,7 @@ from studio import mcp_server as S  # noqa: E402
 
 TOOLS = {"studio_describe", "studio_import", "studio_speak", "studio_music", "studio_card",
          "studio_picture", "studio_assemble", "studio_status", "studio_list",
-         "studio_animate", "studio_extend", "studio_compose", "studio_cast"}
+         "studio_animate", "studio_extend", "studio_compose"}
 
 
 def call(tool, **args):
@@ -173,13 +173,6 @@ def test_descriptions_mention_the_new_engines():
 
 
 
-def test_picture_can_be_painted_from_an_earlier_one():
-    listed = {t.name: t for t in anyio.run(S.mcp.list_tools)}
-    params = listed["studio_picture"].input_schema["properties"]
-    assert "from_picture" in params and "change" in params, sorted(params)
-    assert "from_picture" in listed["studio_picture"].description
-
-
 def test_assemble_refuses_a_still_used_as_a_shot():
     with apart():
         pic = a_picture()
@@ -194,61 +187,13 @@ def test_assemble_still_takes_a_title_card():
     assert not got.startswith("Not starting"), got
 
 
-def test_the_cast_tool_keeps_and_lists_characters():
-    with apart():
-        pic = a_picture()
-        got = call("studio_cast", name="Mara", description="a woman of 30, long black braid, red leather jacket", picture=pic["id"])
-        assert "Mara" in got and pic["id"] in got, got
-        listed = call("studio_cast")
-    assert "Mara" in listed and "red leather jacket" in listed, listed
 
-
-def test_a_picture_of_the_cast_starts_from_their_still_with_their_words():
-    seen = {}
-    saved = (S.images.PICTURES, S.images.paint)
-    S.images.PICTURES = "comfyui"
-    S.images.paint = lambda prompt, aspect, count, negative, seed, **kw: seen.update(prompt=prompt, **kw) or []
-    try:
-        with apart():
-            pic = a_picture()
-            call("studio_cast", name="Mara", description="a woman of 30, long black braid", picture=pic["id"])
-            call("studio_picture", prompt="she waits at the station", cast=["Mara"])
-    finally:
-        S.images.PICTURES, S.images.paint = saved
-    assert seen["prompt"] == "Mara: a woman of 30, long black braid. she waits at the station", seen
-    assert seen["from_picture"] == pic["id"], seen
-
-
-def test_grok_gets_the_casts_stills_as_references():
-    seen = {}
-    saved = (S.images.PICTURES, S.images.picture)
-    S.images.PICTURES = "comfyui"
-    S.images.picture = lambda prompt, aspect, resolution, refs: seen.update(prompt=prompt, refs=list(refs)) or library.get(refs[0])
-    try:
-        with apart():
-            a, b = a_picture(), a_picture()
-            call("studio_cast", name="Mara", description="a woman of 30", picture=a["id"])
-            call("studio_cast", name="Jon", description="a man of 40", picture=b["id"])
-            call("studio_picture", prompt="they argue", cast=["Mara", "Jon"], engine="grok")
-    finally:
-        S.images.PICTURES, S.images.picture = saved
-    assert seen["refs"] == [a["id"], b["id"]], seen
-    assert seen["prompt"].startswith("Mara: a woman of 30. Jon: a man of 40. "), seen
-
-
-def test_an_animation_of_the_cast_carries_their_words():
-    seen = {}
-    saved = S.jobs.start
-    S.jobs.start = lambda job, module, args, header, **kw: seen.update(args=args)
-    try:
-        with apart():
-            pic = a_picture()
-            call("studio_cast", name="Mara", description="a woman of 30, long black braid")
-            call("studio_animate", picture=pic["id"], prompt="she turns to the camera", cast=["Mara"])
-    finally:
-        S.jobs.start = saved
-    prompt = seen["args"][seen["args"].index("--prompt") + 1]
-    assert prompt == "Mara: a woman of 30, long black braid. she turns to the camera", prompt
+def test_pictures_are_painted_fresh_from_their_prompt():
+    listed = {t.name: t for t in anyio.run(S.mcp.list_tools)}
+    assert "studio_cast" not in listed, sorted(listed)
+    for tool in ("studio_picture", "studio_animate", "studio_extend"):
+        params = set(listed[tool].input_schema["properties"])
+        assert not params & {"from_picture", "change", "cast"}, (tool, sorted(params))
 
 def main():
     tests = [(k, v) for k, v in sorted(globals().items()) if k.startswith("test_")]
