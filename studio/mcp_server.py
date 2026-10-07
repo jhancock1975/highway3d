@@ -27,6 +27,7 @@ if HERE not in sys.path:
 from forgiving import ForgivingServer  # noqa: E402
 from studio import (assemble, compose, images, jobs, library, memory,  # noqa: E402
                     music, speech, timeline, xai)
+from studio import cast as casting  # noqa: E402
 
 RENDERS = os.environ.get("STUDIO_RENDERS", os.path.join(HERE, "renders"))
 
@@ -42,6 +43,9 @@ mcp = ForgivingServer(
         "(or an m4a with no video) as a job, and studio_status says how it "
         "is going. studio_animate turns a picture into a clip, studio_extend "
         "carries a clip on, and studio_compose writes music; those are jobs too. "
+        "studio_cast keeps each character's look and best still, so pictures and "
+        "clips that name them (cast=[...]) keep them the same. Every shot in a "
+        "film moves: studio_assemble takes clips, and stills only as cards. "
         "studio_describe has the full edit format and an example."
     ),
 )
@@ -50,7 +54,8 @@ EXAMPLE = {
     "size": "1920x1080", "fps": 30, "name": "pockterm-spot",
     "video": [{"asset": "card-1a2b", "seconds": 3},
               {"asset": "clip-9c01", "from": 12, "seconds": 6, "transition": "dissolve"},
-              {"asset": "pic-44d0", "seconds": 5, "move": "push-in", "transition": "fade"}],
+              {"asset": "clip-44d0", "transition": "fade"},
+              {"asset": "card-5e6f", "seconds": 3, "transition": "fade"}],
     "overlays": [{"asset": "card-7d3e", "at": 4, "seconds": 3, "place": "bottom"},
                  {"captions": "voice-3f2a"}],
     "audio": [{"asset": "voice-3f2a", "at": 0.5},
@@ -100,10 +105,10 @@ def studio_describe() -> str:
         "",
         "EDIT FORMAT (studio_assemble):",
         "  size WxH (default 1920x1080), fps (default 30), name.",
-        "  video: a list played in order. Each item: asset (id or file path), seconds "
-        "(stills default 4, clips run to their end), from (where in a clip to start), "
-        f"transition ({', '.join(timeline.TRANSITIONS)}; 0.5 s), fit "
-        f"({', '.join(timeline.FITS)}), move for stills ({', '.join(timeline.MOVES)}), "
+        "  video: a list played in order. Each item: asset (a clip, or a card for titles; "
+        "a still picture is refused), seconds (cards default 4, clips run to their end), "
+        f"from (where in a clip to start), transition ({', '.join(timeline.TRANSITIONS)}; 0.5 s), fit "
+        f"({', '.join(timeline.FITS)}), move for cards ({', '.join(timeline.MOVES)}), "
         "level (the clip's own sound, 0 to 1).",
         f"  overlays: timed pictures {{asset, at, seconds, place: {', '.join(timeline.PLACES)}}}, "
         "or {captions: a speech id} to show its words as they are said.",
@@ -170,6 +175,26 @@ def studio_card(
 
 
 @mcp.tool()
+def studio_cast(
+    name: Annotated[str, Field(description="The character's name; empty to list the cast.")] = "",
+    description: Annotated[str, Field(description="Their fixed look, in one line: age, build, face, hair, skin, clothes, anything distinctive.")] = "",
+    picture: Annotated[str, Field(description="The pic- id that shows them best; every picture of them starts from it.")] = "",
+) -> str:
+    """Keep each character the same from shot to shot. Cast a character once, with the words that describe their look and the still that shows them best; then name them in studio_picture, studio_animate and studio_extend (cast=[...]) and the tool puts in the same words and starts from the same still every time. Call with a name and description to cast or recast someone (a new picture replaces their still; leave it empty to keep it), with just a name to see them, or with nothing to list the cast."""
+    try:
+        if not name.strip():
+            everyone = list(casting.load().values())
+            if not everyone:
+                return "The cast is empty. Cast each character with a name, a description and their best picture."
+            return "The cast:\n" + "\n".join(casting.said(m) for m in everyone)
+        if not description.strip():
+            return casting.said(casting.members([name])[0])
+        return "Cast " + casting.said(casting.save(name, description, picture.strip() or None)) + "."
+    except Exception as e:
+        return f"Nothing was cast: {_sentence(e)}"
+
+
+@mcp.tool()
 def studio_picture(
     prompt: Annotated[str, Field(description="What the picture shows: subject, setting, light, lens, style.")],
     aspect: Annotated[Literal[xai.ASPECTS], Field(description="Shape of the picture.")] = "16:9",
@@ -181,11 +206,15 @@ def studio_picture(
     from_picture: Annotated[str, Field(description="An earlier pic- id to paint from, so its characters and look carry over (Chroma only).")] = "",
     change: Annotated[float, Field(ge=0.2, le=0.95, description="With from_picture: how far to move from it, 0.2 (a touch) to 0.95 (almost new).")] = 0.8,
     engine: Annotated[Literal["chroma", "grok"], Field(description="chroma (the default where it runs: uncensored, free) or grok (xAI's model: paid credit, refuses explicit content, takes up to 5 reference pictures).")] = "chroma",
+    cast: Annotated[list[str], Field(description="Names from the cast (studio_cast) in this picture; their descriptions lead the prompt word for word.")] = [],
 ) -> str:
-    """Paint pictures from a description, filed in the library as pic- ids. On a machine with STUDIO_PICTURES=comfyui (the vast.ai studio) they come from Chroma1-HD, an uncensored open model, 1 to 4 takes at a time, about a megapixel each; elsewhere from xAI's image model, paid from prepaid credit, one at a time with up to 5 reference pictures. On the vast.ai studio, engine="grok" uses xAI's model instead, when an xAI key was set for the server (XAI_API_KEY); it refuses explicit content, and its references (from_picture counts as one) help keep a character's likeness. aspect is 16:9 (the default), 9:16, 1:1, 4:3, 3:4, 3:2, 2:3, 21:9 or auto; resolution is 1k, 1.5k or 2k (the default). With from_picture, a new keyframe is painted from an earlier one, so the same characters carry over: change about 0.6 keeps the same shot with small changes; about 0.85 moves to a new place or pose, keeping clothes, colours and look, though faces can drift. Keyframes made here can be animated with studio_animate."""
+    """Paint pictures from a description, filed in the library as pic- ids. On a machine with STUDIO_PICTURES=comfyui (the vast.ai studio) they come from Chroma1-HD, an uncensored open model, 1 to 4 takes at a time, about a megapixel each; elsewhere from xAI's image model, paid from prepaid credit, one at a time with up to 5 reference pictures. On the vast.ai studio, engine="grok" uses xAI's model instead, when an xAI key was set for the server (XAI_API_KEY); it refuses explicit content, and its references (from_picture counts as one) help keep a character's likeness. aspect is 16:9 (the default), 9:16, 1:1, 4:3, 3:4, 3:2, 2:3, 21:9 or auto; resolution is 1k, 1.5k or 2k (the default). With cast, the named characters' descriptions lead the prompt and the picture starts from their still (with Grok, their stills are the references). With from_picture, a new keyframe is painted from an earlier one, so the same characters carry over: change about 0.6 keeps the same shot with small changes; about 0.85 moves to a new place or pose, keeping clothes, colours and look, though faces can drift. Keyframes made here can be animated with studio_animate."""
     try:
+        stills = casting.pictures(cast) if cast else []
+        prompt = casting.prompt(cast, prompt) if cast else prompt
         if images.PICTURES == "comfyui" and engine == "grok":
             refs = list(references) + ([from_picture.strip()] if from_picture.strip() else [])
+            refs = list(dict.fromkeys(refs + stills))[:5]
             try:
                 note = images.picture(prompt, aspect, resolution, refs)
             except xai.Refused as e:
@@ -198,7 +227,7 @@ def studio_picture(
             if references:
                 return "No picture was made: reference pictures need xAI; Chroma paints from the description alone."
             notes = images.paint(prompt, aspect, count, negative, seed,
-                                 from_picture=from_picture.strip() or None, change=change)
+                                 from_picture=from_picture.strip() or (stills[0] if stills else None), change=change)
             return "\n".join(library.said(n) for n in notes) + "\nShow them with show; animate one with studio_animate."
         return library.said(images.picture(prompt, aspect, resolution, references)) + "."
     except Exception as e:
@@ -211,7 +240,7 @@ def studio_assemble(
         description="The edit, as an object or JSON text: size, fps, name, video, "
                     "overlays, audio. studio_describe has the format and an example.")],
 ) -> str:
-    """Cut clips, pictures, cards, captions, voice and music together into one mp4, or an m4a when there is no video. Starts a job and returns at once. video is a list played in order: {asset, seconds, from, transition: cut, dissolve or fade, fit: cover or contain, move for stills: none, push-in, pull-out, pan-left or pan-right}. overlays are timed pictures {asset, at, seconds, place} or {captions: a speech id}. audio is timed sound {asset, at, level 0 to 1, fade, duck}. Assets are ids or file paths."""
+    """Cut clips, title cards, captions, voice and music together into one mp4, or an m4a when there is no video. Starts a job and returns at once. Every shot must move: video takes clips, and still pictures only as cards from studio_card (any other still is refused; animate it first). video is a list played in order: {asset, seconds, from, transition: cut, dissolve or fade, fit: cover or contain, move for cards: none, push-in, pull-out, pan-left or pan-right}. overlays are timed pictures {asset, at, seconds, place} or {captions: a speech id}. audio is timed sound {asset, at, level 0 to 1, fade, duck}. Assets are ids or file paths."""
     if isinstance(edit, str):
         try:
             edit = json.loads(edit)
@@ -223,6 +252,11 @@ def studio_assemble(
     if problems:
         return ("Not starting: the edit has problems.\n  "
                 + "\n  ".join(problems[:15]))
+    stills = [v["id"] for v in plan["video"] if v["kind"] == "image" and not str(v["id"]).startswith("card-")]
+    if stills:
+        return (f"Not starting: {', '.join(dict.fromkeys(stills))} {'is a still picture' if len(set(stills)) == 1 else 'are still pictures'} "
+                f"used as a shot. Every shot must move: animate it with studio_animate (and studio_extend for length) "
+                f"and put the clip in instead. Only title and end cards from studio_card may be stills.")
     refused = memory.refusal("assembly")
     if refused:
         return f"Not starting: {refused}"
@@ -263,9 +297,14 @@ def studio_animate(
     seconds: Annotated[int, Field(ge=1, le=5, description="Length, 1 to 5 seconds.")] = 5,
     quality: Annotated[Literal["draft", "final"], Field(description="draft is 480p and quicker; final is 720p.")] = "draft",
     seed: Annotated[int, Field(description="-1 for a new random take; a number repeats one.")] = -1,
+    cast: Annotated[list[str], Field(description="Names from the cast (studio_cast) in this shot; their descriptions lead the prompt word for word.")] = [],
 ) -> str:
     """Animate a picture from the library into a silent clip of up to 5 seconds at 16 frames a second, with Wan 2.2 image-to-video (the uncensored Remix merge). Starts a job and returns at once with its id; follow it with watch_job in the chat, or studio_status. The clip is filed as a clip- id; studio_extend carries it on."""
     refused = _need(picture, "image", "studio_extend to carry a clip on")
+    try:
+        prompt = casting.prompt(cast, prompt) if cast else prompt
+    except ValueError as e:
+        return f"Not starting: {_sentence(e)}"
     if refused:
         return refused
     job = jobs.new()
@@ -285,9 +324,14 @@ def studio_extend(
     quality: Annotated[Literal["match", "draft", "final"],
                        Field(description="match keeps the clip's own quality; draft is 480p; final is 720p.")] = "match",
     seed: Annotated[int, Field(description="-1 for a new random take.")] = -1,
+    cast: Annotated[list[str], Field(description="Names from the cast (studio_cast) in this shot; their descriptions lead the prompt word for word.")] = [],
 ) -> str:
     """Carry a clip on: animate its last frame for up to 5 more seconds and join the two into one longer clip, filed as a new clip- id (the original stays). Repeat to build long shots. Starts a job and returns at once; follow it with watch_job."""
     refused = _need(clip, "video", "studio_animate to start from a picture")
+    try:
+        prompt = casting.prompt(cast, prompt) if cast else prompt
+    except ValueError as e:
+        return f"Not starting: {_sentence(e)}"
     if refused:
         return refused
     job = jobs.new()

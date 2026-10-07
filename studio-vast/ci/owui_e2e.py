@@ -50,6 +50,8 @@ check(model and model["meta"]["capabilities"].get("vision") is True and "attache
       "the director takes pictures the person attaches, and is told to match their style")
 check(model and 'engine="grok"' in model["params"]["system"],
       "the director knows when to paint with Grok and when to stay with Chroma")
+check(model and "studio_studio_cast" in model["params"]["system"] and "cast=[" in model["params"]["system"],
+      "the director casts each character once and names the cast in every picture and clip")
 check(model and "character sheet" in model["params"]["system"] and "from_picture" in model["params"]["system"],
       "the director keeps characters the same by painting each new still from an earlier one")
 check(model and "Every shot is real motion" in model["params"]["system"]
