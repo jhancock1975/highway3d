@@ -62,6 +62,11 @@ minors and non-consensual sexual imagery of real people. The director's instruct
 shown as one, and no real, identifiable person is depicted at all, sexual or not: every
 character is invented. Beyond that the director does not refuse adult subject matter.
 
+Grok, as an option for stills: put `XAI_API_KEY=...` in `~/git/vast-render/.env` before renting,
+and `vast-studio.sh` passes it into the server's environment (it is never printed). The director
+still paints with Chroma unless asked to use Grok (`studio_picture(engine="grok")`); Grok costs
+xAI credit, refuses explicit scenes, and takes up to 5 reference pictures. Clips are always Wan.
+
 ## The GPU and its memory
 
 One RTX PRO 6000 (96 GB) by default. vLLM takes about 40 GB of it (the FP8 weights, a

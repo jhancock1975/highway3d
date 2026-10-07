@@ -78,6 +78,17 @@ def test_picture_without_a_key_is_a_sentence():
                    "environment the studio server runs in."), got
 
 
+
+def test_grok_can_be_chosen_on_a_chroma_machine():
+    saved = S.images.PICTURES
+    S.images.PICTURES = "comfyui"
+    try:
+        got = call("studio_picture", prompt="a fox", engine="grok")
+    finally:
+        S.images.PICTURES = saved
+    assert got.startswith("No picture was made: No xAI key is set"), got
+    assert "~/git/vast-render/.env" in got, got
+
 def test_os_errors_and_timeouts_read_as_sentences():
     import subprocess
     missing = FileNotFoundError(2, "No such file or directory", "/x/.ttsvenv/bin/python")
