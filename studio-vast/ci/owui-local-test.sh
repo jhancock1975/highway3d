@@ -12,12 +12,13 @@ T=$(mktemp -d)
 echo "work folder: $T"
 trap 'kill $(jobs -p) 2>/dev/null || true; wait 2>/dev/null || true' EXIT
 python3 "$HERE/fake_llm.py" 18990 studio-llm &
-(cd "$REPO" && STUDIO_MEDIA="$T/static/studio/media" STUDIO_WORK="$T/work" "$STUDIO_PY" -m studio.mcp_server --host 127.0.0.1 --port 18768 > "$T/mcp.log" 2>&1) &
+# exec in each subshell, so the job is the server itself and the trap's kill stops it, not just a shell
+(cd "$REPO" && STUDIO_MEDIA="$T/static/studio/media" STUDIO_WORK="$T/work" exec "$STUDIO_PY" -m studio.mcp_server --host 127.0.0.1 --port 18768 > "$T/mcp.log" 2>&1) &
 OWUI_BIN="$(dirname "$OWUI_PY")/open-webui"
 (cd "$T" && DATA_DIR="$T/data" STATIC_DIR="$T/static" WEBUI_SECRET_KEY=test WEBUI_AUTH=False ENABLE_OLLAMA_API=False \
   OPENAI_API_BASE_URL=http://127.0.0.1:18990/v1 OPENAI_API_KEY=local OFFLINE_MODE=True \
   ENABLE_TITLE_GENERATION=False ENABLE_TAGS_GENERATION=False ENABLE_FOLLOW_UP_GENERATION=False \
-  "$OWUI_BIN" serve --host 127.0.0.1 --port 18981 > "$T/owui.log" 2>&1) &
+  exec "$OWUI_BIN" serve --host 127.0.0.1 --port 18981 > "$T/owui.log" 2>&1) &
 # Set up while the director's model is "still downloading" (nothing on 18991): the banner must go
 # up, and come down once a model answers there.
 OWUI_URL=http://127.0.0.1:18981 STUDIO_LLM_URL=http://127.0.0.1:18991/v1/models STUDIO_LLM_POLL=1 STUDIO_MCP_PORT_OFFSET=10000 \
